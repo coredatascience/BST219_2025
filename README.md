@@ -3,7 +3,7 @@
 * Course materials for Fall 2025 can be found here. 
 
 # Instructor
-* Dr. Heather Mattie
+Dr. Heather Mattie
 * Lecturer on Biostatistics
 * Co-Director, Health Data Science Master's Program
 * Director of Community Engagement and Development
