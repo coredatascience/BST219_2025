@@ -19,13 +19,13 @@ Dr. Heather Mattie
 
 | Day      | Time | Location     |
 | :---     |    :----   |    :--- |
-| TBD | TBD | Heather's office (Building 1, 4th floor, room 421A) |
-| TBD | TBD | TBD |
-| TBD | TBD | TBD |
-| TBD | TBD | TBD |
+| Monday | 10-11am | FXB G10 |
+| Tuesday | 1-2pm | Heather's office (Building 1, 4th floor, room 421A) |
+| Wednesday | 2:30-3:30pm | Kresge 201, except 10/1 in Kresge 502 |
+| Thursday | 1-2pm | Kresge LL6 |
 
 # Labs
-TBD Zoom (Zoom link in Canvas)
+Friday TBD Zoom (Zoom link in Canvas)
 
 # Downloading course materials using Git with RStudio
 
