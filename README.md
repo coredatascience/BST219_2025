@@ -25,7 +25,7 @@ Dr. Heather Mattie
 | Thursday | 12-1pm | Kresge 205 |
 
 # Labs
-Friday TBD Zoom (Zoom link in Canvas)
+Friday 11:30am-1:00pm Zoom (Zoom link in Canvas)
 
 # Downloading course materials using Git with RStudio
 
