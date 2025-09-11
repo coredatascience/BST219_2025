@@ -11,7 +11,7 @@
 
 
 
-<title>02-data-types.knit</title>
+<title>01-data-types.knit</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -580,18 +580,80 @@ do the same thing, in particular accessing entries.</p>
 <div id="self-assessment-questions" class="section level3">
 <h3>Self-Assessment Questions</h3>
 <ol style="list-style-type: decimal">
-<li><p>Read in the <code>gapminder</code> data set from the dslabs
-package.</p></li>
-<li><p>Is this data a data frame? How many rows and columns are
-there?</p></li>
-<li><p>Print the first few lines of the data set, and then print the
-names of the columns.</p></li>
-<li><p>What type of variable is <code>life_expectancy</code>? What type
-of variable is <code>continent</code>? What type of variable is
-<code>year</code>?</p></li>
-<li><p>Print out the categories contained in the <code>continent</code>
-variable. How many are there?</p></li>
+<li>Read in the <code>gapminder</code> data set from the dslabs
+package.</li>
 </ol>
+<pre class="r"><code>library(dslabs)
+data(&quot;gapminder&quot;)
+head(gapminder)</code></pre>
+<pre><code>##               country year infant_mortality life_expectancy fertility
+## 1             Albania 1960           115.40           62.87      6.19
+## 2             Algeria 1960           148.20           47.50      7.65
+## 3              Angola 1960           208.00           35.98      7.32
+## 4 Antigua and Barbuda 1960               NA           62.97      4.43
+## 5           Argentina 1960            59.87           65.39      3.11
+## 6             Armenia 1960               NA           66.86      4.55
+##   population          gdp continent          region
+## 1    1636054           NA    Europe Southern Europe
+## 2   11124892  13828152297    Africa Northern Africa
+## 3    5270844           NA    Africa   Middle Africa
+## 4      54681           NA  Americas       Caribbean
+## 5   20619075 108322326649  Americas   South America
+## 6    1867396           NA      Asia    Western Asia</code></pre>
+<ol start="2" style="list-style-type: decimal">
+<li>Is this data a data frame? How many rows and columns are there?</li>
+</ol>
+<pre class="r"><code>#library(tidyverse)
+class(gapminder)</code></pre>
+<pre><code>## [1] &quot;data.frame&quot;</code></pre>
+<pre class="r"><code>dim(gapminder)</code></pre>
+<pre><code>## [1] 10545     9</code></pre>
+<pre class="r"><code>#str(gapminder)
+#glimpse(gapminder)</code></pre>
+<p>This is a data frame. It has 10,545 rows and 9 columns.</p>
+<ol start="3" style="list-style-type: decimal">
+<li>Print the first few lines of the data set, and then print the names
+of the columns.</li>
+</ol>
+<pre class="r"><code>head(gapminder)</code></pre>
+<pre><code>##               country year infant_mortality life_expectancy fertility
+## 1             Albania 1960           115.40           62.87      6.19
+## 2             Algeria 1960           148.20           47.50      7.65
+## 3              Angola 1960           208.00           35.98      7.32
+## 4 Antigua and Barbuda 1960               NA           62.97      4.43
+## 5           Argentina 1960            59.87           65.39      3.11
+## 6             Armenia 1960               NA           66.86      4.55
+##   population          gdp continent          region
+## 1    1636054           NA    Europe Southern Europe
+## 2   11124892  13828152297    Africa Northern Africa
+## 3    5270844           NA    Africa   Middle Africa
+## 4      54681           NA  Americas       Caribbean
+## 5   20619075 108322326649  Americas   South America
+## 6    1867396           NA      Asia    Western Asia</code></pre>
+<pre class="r"><code>names(gapminder)</code></pre>
+<pre><code>## [1] &quot;country&quot;          &quot;year&quot;             &quot;infant_mortality&quot; &quot;life_expectancy&quot; 
+## [5] &quot;fertility&quot;        &quot;population&quot;       &quot;gdp&quot;              &quot;continent&quot;       
+## [9] &quot;region&quot;</code></pre>
+<ol start="4" style="list-style-type: decimal">
+<li>What type of variable is <code>life_expectancy</code>? What type of
+variable is <code>continent</code>? What type of variable is
+<code>year</code>?</li>
+</ol>
+<pre class="r"><code>class(gapminder$life_expectancy)</code></pre>
+<pre><code>## [1] &quot;numeric&quot;</code></pre>
+<pre class="r"><code>class(gapminder$continent)</code></pre>
+<pre><code>## [1] &quot;factor&quot;</code></pre>
+<pre class="r"><code>class(gapminder$year)</code></pre>
+<pre><code>## [1] &quot;integer&quot;</code></pre>
+<pre class="r"><code>gapminder$life_expectancy[2]</code></pre>
+<pre><code>## [1] 47.5</code></pre>
+<ol start="5" style="list-style-type: decimal">
+<li>Print out the categories contained in the <code>continent</code>
+variable. How many are there?</li>
+</ol>
+<pre class="r"><code>levels(gapminder$continent)</code></pre>
+<pre><code>## [1] &quot;Africa&quot;   &quot;Americas&quot; &quot;Asia&quot;     &quot;Europe&quot;   &quot;Oceania&quot;</code></pre>
+<p>There are 5 categories for continents.</p>
 </div>
 </div>
 </div>
