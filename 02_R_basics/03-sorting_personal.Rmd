@@ -1,0 +1,275 @@
+## Sorting
+
+Now that we have some basic R knowledge under our belt, let's try to gain some insights into the safety of different states in the context of gun murders. 
+
+### `sort` 
+
+We want to rank the states from least to most gun murders. The function `sort` sorts a vector in **increasing** order. So we can see the number of gun murders by typing 
+
+```{r}
+library(dslabs)
+data(murders)
+sort(murders$total)
+```
+
+However, this does not give us information about which states have which murder totals. For example, we don't know which state had `r max(murders$total)` murders in 2010. 
+
+### `order`
+
+The function `order` is closer to what we want. It takes a vector and returns the vector of indexes that sort the input vector. This may sound confusing so let's look at a simple example: we create a vector and sort it:
+
+```{r}
+x <- c(31, 4, 15, 92, 65)
+sort(x)
+```
+
+Rather than sort the vector, the function `order` gives us back the index that, if used to index the vector, will sort it:
+
+```{r}
+index <- order(x)
+x[index]
+```
+
+If we look at this index we see why it works:
+
+```{r}
+x
+order(x)
+```
+
+Note that the second entry of `x` is the smallest so `order(x)` starts with `2`. The next smallest is the third entry so the second entry is `3` and so on. 
+
+How does this help us order the states by murders? First remember that the entries of vectors you access with `$` follow the same order as the rows in the table. So, for example, these two vectors, containing the state names and abbreviations respectively, are matched by their order:
+
+```{r}
+murders$state[1:10]
+murders$abb[1:10]
+```
+
+So this means we can now order the state names by their total murders by first obtaining the index that orders the vectors according to murder totals, and then indexing the state names or abbreviation vector:
+
+```{r}
+ind <- order(murders$total) 
+murders$abb[ind] 
+```
+
+We see that California had the most murders.
+
+### `max` and `which.max`
+
+If we are only interested in the entry with the largest value we can use `max` for the value
+
+```{r}
+max(murders$total)
+```
+
+and `which.max` for the index of the largest value
+
+```{r}
+i_max <- which.max(murders$total)
+murders$state[i_max]
+```
+
+For the minimum we can use `min` and `which.min` in the same way.
+
+So is California the most dangerous state? In a next section we argue that we should be considering rates not totals. Before doing that we introduce one last order related function: `rank`
+
+### `rank`
+
+Although less useful than `order` and `sort`, the function `rank` is also related to order.
+For any given list it gives you a vector with the rank of the first entry, second entry, etc. of the vector. Here is a simple example.
+
+```{r}
+x <- c(31, 4, 15, 92, 65)
+rank(x)
+```
+
+To summarize, let's look at the results of the three functions we have introduced:
+
+```{r, echo=FALSE}
+knitr::kable(data.frame(original = x, sort = sort(x), order = order(x), rank = rank(x)))
+```
+
+
+### Self-Assessment Questions
+
+1. Create x <- c(42, 7, 19, 73, 5, 88). 
+
+* Sort x in ascending order.
+* Sort x in descending order.
+
+```{r}
+
+```
+
+2. Using the same x, return the indices that would sort x (i.e., use order()). Use those indices to reconstruct the sorted x without calling sort().
+
+```{r}
+
+```
+
+3. Let z <- c(12, NA, 3, 18, NA, 9).
+
+* Sort z placing NA values at the end.
+* Sort z placing NA values at the beginning.
+
+```{r}
+
+```
+
+4. Create a <- c(10, 5, 10, 3, 4). Get the rank order of a (smallest to largest) using order().
+
+```{r}
+
+```
+
+5. Use df <- data.frame(id = 1:5, score = c(88, 72, 91, 71, 85)). Return df sorted by score (ascending).
+
+```{r}
+
+```
+
+
+6. Create c1 <- c("2", "10", "1") and n1 <- c(2, 10, 1). Sort each vector and compare the results in a one-line comment.
+
+```{r}
+
+```
+
+7. Make f <- factor(c("medium", "high", "low", "medium"), levels = c("low","medium","high")).
+* Sort f by the factor order (low < medium < high).
+* Convert f to character and sort alphabetically; compare to factor-level sort.
+	
+```{r}
+
+```
+
+8. For w <- c(NA, 3, 11, NA, 5, 7), sort in descending order with NAs last using a single call.
+
+```{r}
+
+```
+
+9. Using `mtcars`, return the row names of the five cars with the lowest mpg (ascending), and then the five highest (descending). Return mtcars sorted by cyl (ascending) and mpg (descending).
+
+```{r}
+
+```
+
+
+### Solutions
+
+1. Create x <- c(42, 7, 19, 73, 5, 88). 
+
+* Sort x in ascending order.
+* Sort x in descending order.
+
+```{r}
+x <- c(42, 7, 19, 73, 5, 88)
+
+# Ascending
+sort(x)
+
+# Descending
+sort(x, decreasing = TRUE)
+```
+
+2. Using the same x, return the indices that would sort x (i.e., use order()). Use those indices to reconstruct the sorted x without calling sort().
+
+```{r}
+x <- c(42, 7, 19, 73, 5, 88)
+
+# Indices that would sort x
+order(x)
+
+# Reconstruct sorted x using those indices
+x[order(x)]
+```
+
+3. Let z <- c(12, NA, 3, 18, NA, 9).
+
+* Sort z placing NA values at the end.
+* Sort z placing NA values at the beginning.
+
+```{r}
+z <- c(12, NA, 3, 18, NA, 9)
+
+# NA values at the end
+sort(z, na.last = TRUE)
+
+# NA values at the beginning
+sort(z, na.last = FALSE)
+```
+
+4. Create a <- c(10, 5, 10, 3, 5). Get the rank order of a (smallest to largest) using order().
+
+```{r}
+a <- c(10, 5, 10, 3, 5)
+
+rank(a) # default ties.method = "average"
+
+rank(a, ties.method = "first")
+
+# Note: default averages the ranks of ties; "first" breaks ties by first appearance.
+```
+
+5. Use df <- data.frame(id = 1:5, score = c(88, 72, 91, 72, 85)). Return df sorted by score (ascending).
+
+```{r}
+df <- data.frame(id = 1:5, score = c(88, 72, 91, 72, 85))
+
+df[order(df$score), ]
+```
+
+
+6. Create c1 <- c("2", "10", "1") and n1 <- c(2, 10, 1). Sort each vector and compare the results in a one-line comment.
+
+```{r}
+c1 <- c("2", "10", "1")
+n1 <- c(2, 10, 1)
+
+sort(c1)
+
+sort(n1)
+```
+
+7. Make f <- factor(c("medium", "high", "low", "medium"), levels = c("low","medium","high")).
+* Sort f by the factor order (low < medium < high).
+* Convert f to character and sort alphabetically; compare to factor-level sort.
+	
+```{r}
+f <- factor(c("medium", "high", "low", "medium"),
+            levels = c("low", "medium", "high"))
+
+# Sort by factor levels (low < medium < high)
+sort(f)
+
+# Convert to character and sort alphabetically
+sort(as.character(f))
+
+# Note: factor sort respects level order; character sort uses alphabetical order.
+```
+
+8. For w <- c(NA, 3, 11, NA, 5, 7), sort in descending order with NAs last using a single call.
+
+```{r}
+w <- c(NA, 3, 11, NA, 5, 7)
+
+sort(w, decreasing = TRUE, na.last = TRUE)
+```
+
+9. Using `mtcars`, return the row names of the five cars with the lowest mpg (ascending), and then the five highest (descending). Return mtcars sorted by cyl (ascending) and mpg (descending).
+
+```{r}
+# Five lowest mpg (ascending)
+rownames(head(mtcars[order(mtcars$mpg), ], 5))
+
+# Five highest mpg (descending)
+rownames(head(mtcars[order(-mtcars$mpg), ], 5))
+
+# Sort by cyl (asc) then mpg (desc)
+mtcars[order(mtcars$cyl, -mtcars$mpg), ][1:10, ]
+```
+
+
+
