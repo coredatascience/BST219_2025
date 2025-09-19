@@ -625,6 +625,7 @@ introduction. Other functions that are widely used are
 </div>
 <div id="self-assessment-questions" class="section level3">
 <h3>Self-Assessment Questions</h3>
+<pre class="r"><code>library(dslabs)</code></pre>
 <ol style="list-style-type: decimal">
 <li>What will this conditional expression return?</li>
 </ol>
@@ -636,24 +637,132 @@ if(all(x&gt;0)){
   print(&quot;Not all positives&quot;)
 }</code></pre>
 <ol start="2" style="list-style-type: decimal">
-<li>Which of the following expressions is always <code>FALSE</code> when
-at least one entry of a logical vector <code>x</code> is TRUE?</li>
+<li>Using murders, create a logical vector high_rate that is TRUE if a
+state’s murder rate is above the national median.</li>
 </ol>
-<p>A. <code>all(x)</code> B. <code>any(x)</code> C. <code>any(!x)</code>
-D. <code>all(!x)</code></p>
-<ol start="3" style="list-style-type: decimal">
-<li>The function <code>nchar</code> tells you how many characters long a
-character vector is. For example:</li>
-</ol>
-<pre class="r"><code>library(dslabs)
-data(murders)
-char_len &lt;- nchar(murders$state)
-char_len[1:5]</code></pre>
-<pre><code>## [1]  7  6  7  8 10</code></pre>
-<p>Write a line of code that assigns to the object
-<code>new_names</code> the state abbreviation when the state name is
-longer than 8 characters.</p>
 <pre class="r"><code># Your code here</code></pre>
+<ol start="3" style="list-style-type: decimal">
+<li>Using the <code>gapminder</code> dataset from the
+<code>dslabs</code> package, create a vector called <code>le_cat</code>
+with “Low” (&lt; 60), “Medium” (&gt;= 60, &lt;= 75), and “High” (&gt;75)
+categories for life expectancy.</li>
+</ol>
+<pre class="r"><code># Your code here</code></pre>
+<ol start="4" style="list-style-type: decimal">
+<li>Using the <code>heights</code> dataset from the <code>dslabs</code>
+package, convert <code>height</code> to centimeters only for males. Note
+that to convert inches to centimeters, multiply by 2.54.</li>
+</ol>
+<pre class="r"><code># Your code here</code></pre>
+<ol start="5" style="list-style-type: decimal">
+<li>Using the <code>murders</code> dataset from the <code>dslabs</code>
+package, use a for loop to compute the mean murder rate by
+<code>region</code>.</li>
+</ol>
+<pre class="r"><code># Your code here</code></pre>
+<ol start="6" style="list-style-type: decimal">
+<li>Write a function that calculate the percent of missing values
+(<code>NA</code>s) in a column of a data frame. Use the
+<code>is.na</code> function to check if a value is an <code>NA</code>.
+Calculate the percent missing values in the
+<code>infant_mortality</code> column of the <code>gapminder</code>
+dataset from the <code>dslabs</code> package.</li>
+</ol>
+<pre class="r"><code># Your code here</code></pre>
+</div>
+<div id="self-assessment-solutions" class="section level3">
+<h3>Self-Assessment Solutions</h3>
+<ol style="list-style-type: decimal">
+<li>What will this conditional expression return?</li>
+</ol>
+<pre class="r"><code>x &lt;- c(1,2,-3,4)
+    
+if(all(x&gt;0)){
+  print(&quot;All positives&quot;)
+} else{
+  print(&quot;Not all positives&quot;)
+}</code></pre>
+<p>Not all positives.</p>
+<ol start="2" style="list-style-type: decimal">
+<li>Using murders, create a logical vector high_rate that is TRUE if a
+state’s murder rate is above the national median.</li>
+</ol>
+<pre class="r"><code>data(murders)
+murders$rate &lt;- murders$total / murders$population * 100000
+murders$high_rate &lt;- ifelse(murders$rate &gt; median(murders$rate), TRUE, FALSE)
+head(murders)</code></pre>
+<pre><code>##        state abb region population total     rate high_rate
+## 1    Alabama  AL  South    4779736   135 2.824424      TRUE
+## 2     Alaska  AK   West     710231    19 2.675186     FALSE
+## 3    Arizona  AZ   West    6392017   232 3.629527      TRUE
+## 4   Arkansas  AR  South    2915918    93 3.189390      TRUE
+## 5 California  CA   West   37253956  1257 3.374138      TRUE
+## 6   Colorado  CO   West    5029196    65 1.292453     FALSE</code></pre>
+<ol start="3" style="list-style-type: decimal">
+<li>Using the <code>gapminder</code> dataset from the
+<code>dslabs</code> package, create a vector called <code>le_cat</code>
+with “Low” (&lt; 60), “Medium” (&gt;= 60, &lt;= 75), and “High” (&gt;75)
+categories for life expectancy.</li>
+</ol>
+<pre class="r"><code>data(gapminder)
+
+# Note that the code below uses nested ifelse functions since we have 3 categories
+
+gapminder$le_cat &lt;- ifelse(gapminder$life_expectancy &lt; 60, &quot;Low&quot;,
+                     ifelse(gapminder$life_expectancy &lt; 75, &quot;Medium&quot;, &quot;High&quot;))
+head(gapminder$le_cat)</code></pre>
+<pre><code>## [1] &quot;Medium&quot; &quot;Low&quot;    &quot;Low&quot;    &quot;Medium&quot; &quot;Medium&quot; &quot;Medium&quot;</code></pre>
+<ol start="4" style="list-style-type: decimal">
+<li>Using the <code>heights</code> dataset from the <code>dslabs</code>
+package, convert <code>height</code> to centimeters only for males. Note
+that to convert inches to centimeters, multiply by 2.54.</li>
+</ol>
+<pre class="r"><code>data(heights)
+
+heights$height_mixed &lt;- ifelse(heights$sex == &quot;Male&quot;, heights$height * 2.54, heights$height)
+head(heights)</code></pre>
+<pre><code>##      sex height height_mixed
+## 1   Male     75       190.50
+## 2   Male     70       177.80
+## 3   Male     68       172.72
+## 4   Male     74       187.96
+## 5   Male     61       154.94
+## 6 Female     65        65.00</code></pre>
+<ol start="5" style="list-style-type: decimal">
+<li>Using the <code>murders</code> dataset from the <code>dslabs</code>
+package, use a for loop to compute the mean murder rate by
+<code>region</code>.</li>
+</ol>
+<pre class="r"><code>data(murders)
+
+# Create vector of region categories
+regions &lt;- levels(murders$region)
+
+for(i in regions){
+  murders$murder_rate &lt;- murders$total / murders$population * 100000
+  mean_rate = mean(murders$murder_rate[murders$region == i])
+  print(paste0(&quot;The mean murder rate in the &quot;, i, &quot; is &quot;, round(mean_rate, 2)))
+}</code></pre>
+<pre><code>## [1] &quot;The mean murder rate in the Northeast is 1.85&quot;
+## [1] &quot;The mean murder rate in the South is 4.42&quot;
+## [1] &quot;The mean murder rate in the North Central is 2.18&quot;
+## [1] &quot;The mean murder rate in the West is 1.83&quot;</code></pre>
+<ol start="6" style="list-style-type: decimal">
+<li>Write a function that calculate the percent of missing values
+(<code>NA</code>s) in a column of a data frame. Use the
+<code>is.na</code> function to check if a value is an <code>NA</code>.
+Calculate the percent missing values in the
+<code>infant_mortality</code> column of the <code>gapminder</code>
+dataset from the <code>dslabs</code> package.</li>
+</ol>
+<pre class="r"><code>data(gapminder)
+
+pct_missing &lt;- function(x) {
+  mean(is.na(x)) * 100
+}
+
+pct_missing(gapminder$infant_mortality)</code></pre>
+<pre><code>## [1] 13.77904</code></pre>
 </div>
 </div>
 

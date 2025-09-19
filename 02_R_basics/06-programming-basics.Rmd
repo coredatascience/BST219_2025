@@ -210,6 +210,10 @@ It turns out that we rarely use for loops in R. This is because there are usuall
 
 ### Self-Assessment Questions
 
+```{r}
+library(dslabs)
+```
+
 
 1. What will this conditional expression return?
 
@@ -223,30 +227,126 @@ if(all(x>0)){
 }
 ```
 
-2. Which of the following expressions is always `FALSE` when at least one entry of a logical vector `x` is TRUE?
+2. Using murders, create a logical vector high_rate that is TRUE if a state’s murder rate is above the national median.
 
-A. `all(x)`
-B. `any(x)`
-C. `any(!x)`
-D. `all(!x)`
-
-
-3. The function `nchar` tells you how many characters long a character vector is. For example:
-
-    
 ```{r}
-library(dslabs)
-data(murders)
-char_len <- nchar(murders$state)
-char_len[1:5]
+# Your code here
 ```
 
+3. Using the `gapminder` dataset from the `dslabs` package, create a vector called `le_cat` with "Low" (< 60), "Medium" (>= 60, <= 75), and "High" (>75) categories for life expectancy. 
 
-Write a line of code that assigns to the object `new_names` the state abbreviation when the state name is longer than 8 characters.
-    
+```{r}
+# Your code here
+```
+
+4. Using the `heights` dataset from the `dslabs` package, convert `height` to centimeters only for males. Note that to convert inches to centimeters, multiply by 2.54. 
+
+```{r}
+# Your code here
+```
+
+5. Using the `murders` dataset from the `dslabs` package, use a for loop to compute the mean murder rate by `region`. 
+
+```{r}
+# Your code here
+```
+
+6. Write a function that calculate the percent of missing values (`NA`s) in a column of a data frame. Use the `is.na` function to check if a value is an `NA`. Calculate the percent missing values in the `infant_mortality` column of the `gapminder` dataset from the `dslabs` package. 
+
 ```{r}
 # Your code here
 ```
 
 
 ### Self-Assessment Solutions
+
+1. What will this conditional expression return?
+
+```{r, eval=FALSE}
+x <- c(1,2,-3,4)
+    
+if(all(x>0)){
+  print("All positives")
+} else{
+  print("Not all positives")
+}
+```
+
+Not all positives.
+
+2. Using murders, create a logical vector high_rate that is TRUE if a state’s murder rate is above the national median.
+
+```{r}
+data(murders)
+murders$rate <- murders$total / murders$population * 100000
+murders$high_rate <- ifelse(murders$rate > median(murders$rate), TRUE, FALSE)
+head(murders)
+```
+
+3. Using the `gapminder` dataset from the `dslabs` package, create a vector called `le_cat` with "Low" (< 60), "Medium" (>= 60, <= 75), and "High" (>75) categories for life expectancy. 
+
+```{r}
+data(gapminder)
+
+# Note that the code below uses nested ifelse functions since we have 3 categories
+
+gapminder$le_cat <- ifelse(gapminder$life_expectancy < 60, "Low",
+                     ifelse(gapminder$life_expectancy < 75, "Medium", "High"))
+head(gapminder$le_cat)
+```
+
+4. Using the `heights` dataset from the `dslabs` package, convert `height` to centimeters only for males. Note that to convert inches to centimeters, multiply by 2.54. 
+
+```{r}
+data(heights)
+
+heights$height_mixed <- ifelse(heights$sex == "Male", heights$height * 2.54, heights$height)
+head(heights)
+```
+
+5. Using the `murders` dataset from the `dslabs` package, use a for loop to compute the mean murder rate by `region`. 
+
+```{r}
+data(murders)
+
+# Create vector of region categories
+regions <- levels(murders$region)
+
+for(i in regions){
+  murders$murder_rate <- murders$total / murders$population * 100000
+  mean_rate = mean(murders$murder_rate[murders$region == i])
+  print(paste0("The mean murder rate in the ", i, " is ", round(mean_rate, 2)))
+}
+```
+
+6. Write a function that calculate the percent of missing values (`NA`s) in a column of a data frame. Use the `is.na` function to check if a value is an `NA`. Calculate the percent missing values in the `infant_mortality` column of the `gapminder` dataset from the `dslabs` package. 
+
+```{r}
+data(gapminder)
+
+pct_missing <- function(x) {
+  mean(is.na(x)) * 100
+}
+
+pct_missing(gapminder$infant_mortality)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
