@@ -1,0 +1,406 @@
+---
+title: "Basic Data Wrangling"
+output:
+  html_document:
+    toc: true
+---
+
+### TLDR: dplyr functions covered
+
+* Use `mutate()` to create or transform columns.
+* Use `filter()` to keep rows that match conditions.
+* Use `select()` to choose columns (and rename with new = old).
+* Use `arrange()` to sort rows (use `desc()` for descending).
+* Use `summarize()` to collapse rows to summary values; pair with `group_by()` for grouped summaries.
+* Use `slice()` to select, remove and duplicate rows.
+* Chain steps with the pipe `%>%` to build clear, readable workflows.
+	
+	
+```{r}
+library(dslabs)
+data(murders)
+```
+
+Up to now we have been changing vectors by reordering them and subsetting them through indexing. But once we start more advanced analyses, we will want to prepare data tables for data analysis. We refer to this task as **data wrangling**. 
+For this purpose we will introduce the `dplyr` package which provides intuitive functionality for working with tables. 
+
+Once you install `dplyr` you can load it using 
+
+```{r, warning=FALSE, message=FALSE}
+library(dplyr)
+```
+
+This package introduces functions that perform the most common operations in data wrangling and uses names for these functions that are relatively easy to remember. For example, to change the data table by adding a new column, we use `mutate`. To filter the data table to a subset of rows we use `filter` and to subset the data by selecting specific columns we use `select`. We can also perform a series of operations. For example, select and then filter, by sending the results of one function to another using what is called the _pipe operator_: `%>%`. Some details are included below. 
+
+### Adding a column with `mutate`
+
+We want all the necessary information for our analysis to be included in the data table. So the first task is to add the murder rate to our data frame. The function mutate takes the data frame as a first argument and the name and values of the variable in the second using the convention `name = values`. So to add murder rate we use:
+ 
+```{r,message=FALSE}
+murders <- mutate(murders, murder_rate = total / population * 100000)
+```
+
+Note that here we used `total` and `population` in the function, which are objects that are **not** defined in our workspace. What is happening is that `mutate` knows to look for these variables in the `murders` data frame because the first argument we put was the `murders` data frame. So the intuitive line of code above does exactly what we want. We can see the new column is added:
+
+```{r}
+head(murders)
+```
+
+Also note that we have over-written the original `murders` object. However, this does *not* change the object that is saved and loaded with `data(murders)`. If we load the `murders` data again, the original will over-write our mutated version.
+
+Note: If we reload the dataset from the `dslabs` package it will rewrite our new data frame with the original.
+
+### Subsetting with `filter`
+
+Now suppose that we want to filter the data table to only show the entries for which the murder rate is lower than 0.71. To do this we use the `filter` function which takes the data table as an argument and then the conditional statement as the next argument. Like mutate, we can use the data table variable names inside the function and it will know we mean the columns and not objects in the workspace.
+
+```{r}
+filter(murders, murder_rate <= 0.71)
+```
+
+
+### Selecting columns with `select`
+
+Although our data table only has six columns, some data tables include hundreds. If we want to view just a few, we can use the `select` function. In the code below we select three columns, assign this to a new object and then filter the new object: 
+
+```{r}
+new_table <- select(murders, state, region, murder_rate)
+filter(new_table, murder_rate <= 0.71)
+```
+
+Note that in the call to `select`, the first argument, `murders`, is an object but `state`, `region`, and `murder_rate` are variable names. 
+
+### The pipe: `%>%`
+
+In the code above we wanted to show the three variables for states that have murder rates below 0.71. To do this we defined an intermediate object. In `dplyr` we can write code that looks more like our description of what we want to: 
+
+>> original data $\rightarrow$ select $\rightarrow$ filter
+
+For such an operation, we can use the pipe `%>%`. The code looks like this:
+
+```{r}
+murders %>% select(state, region, murder_rate) %>% filter(murder_rate <= 0.71)
+```
+
+This line of code is equivalent to the two lines of code above. Note that when using the pipe we no longer need to specify the murders data frame since the `dplyr` functions assume that whatever is being _piped_ is what should be operated on.
+
+## Summarizing data with `dplyr`
+
+An important part of exploratory data analysis is summarizing data. It is sometimes useful to split data into groups before summarizing. 
+
+### Summarize
+
+The `summarize` function in `dplyr` provides a way to compute summary statistics with intuitive and readable code. We can compute the average of the murder rates like this.
+
+
+```{r}
+murders %>% summarize(avg = mean(murder_rate))
+```
+
+However, note that the US murder rate is **not** the average of the state murder rates. Because in this computation the small states are given the same weight as the large ones. The US murder rate is proportional to the total US murders divided by the total US population.
+
+To compute the country's average murder rate using the `summarize` function, we can do the following: 
+
+```{r}
+us_murder_rate <- murders %>% 
+  summarize(murder_rate = sum(total) / sum(population) * 100000)
+
+us_murder_rate
+```
+
+
+This computation counts larger states proportionally to their size and this results in a larger value.
+
+### Using the dot to access the piped data 
+
+The `us_murder_rate` object defined above represents just one number. Yet we are storing it in a data frame
+
+```{r}
+class(us_murder_rate)
+```
+
+since, as with most `dplyr` functions, `summarize` *always returns a data frame*.
+
+This might be problematic if we want to use the result with functions that require a numeric value. Here we show a useful trick to access values stored in data piped via `%>%`: when a data object is piped it can be accessed using the dot `.`. To understand what we mean take a look at this line of code:
+
+```{r}
+us_murder_rate %>% .$murder_rate
+```
+
+Note that this returns the value in the `murder_rate` column of `us_murder_rate` making it equivalent to `us_murder_rate$murder_rate`. To understand this line, you just need to think of `.` as a placeholder for the data that is being passed through the pipe. Because this data object is a data frame, we can access it's columns with the `$`. 
+
+To get a number from the original data table with one line of code we can type:
+
+```{r}
+us_murder_rate <- murders %>% 
+  summarize( murder_rate = sum(total) / sum(population) * 100000) %>%
+  .$murder_rate
+
+us_murder_rate
+```
+
+which is now a numeric:
+
+```{r}
+class(us_murder_rate)
+```
+
+We will see other instances in which using the `.` is useful. For now, we will only use it to produce numeric vectors from pipelines constructed with `dplyr`.
+
+### Group then summarize
+
+A common operation in data exploration is to first split data into groups and then compute summaries for each group. For example, we may want to compute the median murder rate for each region. The `group_by` function helps us do this. 
+
+If we type this:
+
+```{r}
+murders %>% 
+  group_by(region) %>%
+  summarize(median_rate = median(murder_rate))
+```
+
+we get a table with the median murde rate for each of the four regions.
+
+### Sorting data tables
+
+When examining a dataset it is often convenient to sort the table by the different columns. We know about the `order` and `sort` functions, but for ordering entire tables, the `dplyr` function `arrange` is useful. For example, here we order the states by population size:
+
+```{r}
+murders %>% 
+  arrange(population) %>% 
+  head()
+```
+
+Note that we get to decide which column to sort by. To see the states by murder rate, from smallest to largest, we arrange by `murder_rate` instead:
+
+```{r}
+murders %>% 
+  arrange(murder_rate) %>% 
+  head()
+```
+
+Note that the default behavior is to order in ascending order. In `dplyr`, the function `desc` transforms a vector to be in descending order. So if we want to sort the table in descending order we can type
+
+```{r}
+murders %>% 
+  arrange(desc(murder_rate)) %>% 
+  head()
+```
+
+#### Nested Sorting
+
+If we are ordering by a column with ties we can use a second column to break the tie. Similarly, a third column can be used to break ties between the first and second and so on. Here we order by `region` then within region we order by murder rate:
+
+```{r}
+murders %>% 
+  arrange(region, murder_rate) %>% 
+  head()
+```
+
+
+#### The top $n$
+
+In the code above we have used the function `head` to avoid having the page fill with the entire data. If we want to see a larger proportion we can use the `top_n` function. Here are the first 10 murder rates:
+
+```{r}
+murders %>% top_n(10, murder_rate)
+```
+
+Note that `top_n` picks the highest `n` based on the column given as a second argument. However, the rows are not sorted. 
+
+If the second argument is left blank, then it just takes the first `n` columns. This means that to see the top 10 states ranked by murder rate, sorted by murder rate we can type:
+
+
+```{r}
+murders %>% 
+  arrange(desc(murder_rate)) %>% 
+  top_n(10)
+```
+
+
+### Using `slice` to subset data frames
+
+The `slice` set of functions index rows by their integer locations, and are used to select, remove, and duplicate rows. 
+
+Here we can remove rows 3-5 and 9-51 using thw `slice` function and `-c()` to indicate we want to remove them. 
+
+```{r}
+murders %>% slice(-c(3:5, 9:51))
+```
+
+If we want to keep those rows, we would remove the `-` sign. 
+
+```{r}
+murders %>% slice(c(3:5, 9:51))
+```
+
+The `slice_head` function returns the first _n_ rows where you specify _n_. 
+
+```{r}
+murders %>% slice_head(n = 3)
+```
+
+Similarly, the slide_tail function returns the last _n_ rows. 
+
+```{r}
+murders %>% slice_tail(n = 5)
+```
+
+To duplicate certain rows in a data frame a specific number of times (e.g., 3 times), use the `rep` function in combination with `slice`. The `rep` function will replicate the first argument _n_ times. 
+
+To duplicate the first row of the `murders` dataframe 3 times, we would type
+
+
+```{r}
+murders %>%
+  slice(rep(1, 3))
+```
+
+
+To duplicate the first 3 rows 3 times we would type
+
+```{r}
+murders %>%
+  slice(rep(1:3, 3))
+```
+
+### Self-Assessment Questions
+
+```{r, message=FALSE}
+# Setup
+library(dslabs)
+library(dplyr)
+
+data(murders)
+data(gapminder)
+data(heights)
+```
+
+1. Using the `murders` dataset, add a `murder_rate` column as murders per 100,000 and a `pop_mill` column as population in millions. Return the first 6 rows with state, region, rate, and pop_mill (hint: use the `head()` function).
+
+```{r}
+# Your code here
+```
+
+2. Standardize `height` **within each sex** in the `heights` dataset and store the values as `z_height`. Show the first 6 rows. Note that values are standardized by subtracting the mean and dividing by the standard deviation of the column values. Use the `mean` and `sd` functions. 
+
+```{r}
+# Your code here
+```
+
+3. Using the `murders` dataset, keep states in the South with murder rate > 3 (use the `murder_rate` column you computed in question 1). Return only the state, rate, and region columns. How many states does this result in?
+
+```{r}
+# Your code here
+```
+Only one state in the South has a murder rate above 3: Alabama. 
+
+4. Using the `gapminder` dataset, for the year 2010 and non-missing `life_expectancy`, list the top 10 countries by life expectancy, i.e., the 10 countries with the highest life expectancy. 
+
+```{r}
+# Your code here
+```
+
+5. Using the `gapminder` dataset, filter out missing values for `life_expectancy` and compute the mean, median, and standard deviation of life expectancy. 
+
+```{r}
+# Your code here
+```
+
+6. Using the `gapminder` dataset, compute the mean and standard deviation of life expectancy by continent for the year 1986. Then sort the continents in descending order according to mean life expectancy. Filter out missing values. 
+
+```{r}
+# Your code here
+```
+
+
+### Self-Assessment Solutions
+
+1. Using the `murders` dataset, add a `murder_rate` column as murders per 100,000 and a `pop_mill` column as population in millions. Return the first 6 rows with state, region, rate, and pop_mill (hint: use the `head()` function).
+
+```{r}
+murders_with_rates<- murders %>%
+  mutate(murder_rate = total / population * 100000,
+         pop_mill = population / 1e6) %>%
+  select(state, region, murder_rate, pop_mill) %>%
+  head()
+```
+
+2. Standardize `height` **within each sex** in the `heights` dataset and store the values as `z_height`. Show the first 6 rows. Note that values are standardized by subtracting the mean and dividing by the standard deviation of the column values. Use the `mean` and `sd` functions. 
+
+```{r}
+heights %>%
+  group_by(sex) %>%
+  mutate(z_height = (height - mean(height)) / sd(height)) %>%
+  ungroup() %>%
+  head()
+```
+
+3. Using the `murders` dataset, keep states in the South with murder rate > 3 (use the `murder_rate` column you computed in question 1). Return only the state, rate, and region columns. How many states does this result in?
+
+```{r}
+murders_with_rates %>% 
+  filter(region == "South", murder_rate > 3) %>%
+  select(state, murder_rate, region) %>%
+  head()
+```
+Only one state in the South has a murder rate above 3: Alabama. 
+
+4. Using the `gapminder` dataset, for the year 2010 and non-missing `life_expectancy`, list the top 10 countries by life expectancy, i.e., the 10 countries with the highest life expectancy. 
+
+```{r}
+gapminder %>%
+  filter(year == 2010, 
+         !is.na(life_expectancy)) %>%
+  arrange(desc(life_expectancy)) %>%
+  select(country, continent, life_expectancy) %>%
+  head(10)
+```
+
+5. Using the `gapminder` dataset, filter out missing values for `life_expectancy` and compute the mean, median, and standard deviation of life expectancy. 
+
+```{r}
+# Solution #1: use the filter function to filter out missing values of life expectancy
+gapminder %>%
+  filter(!is.na(life_expectancy)) %>%
+  summarize(
+    mean_le   = mean(life_expectancy),
+    median_le = median(life_expectancy),
+    sd_le     = sd(life_expectancy)
+  )
+
+# Solution #2: use the na.rm = TRUE argument in the mean, median, and sd functions to ignore missing values 
+gapminder %>%
+  summarize(
+    mean_le   = mean(life_expectancy, na.rm = TRUE),
+    median_le = median(life_expectancy, na.rm = TRUE),
+    sd_le     = sd(life_expectancy, na.rm = TRUE)
+  )
+```
+
+6. Using the `gapminder` dataset, compute the mean and standard deviation of life expectancy by continent for the year 1986. Then sort the continents in descending order according to mean life expectancy. Filter out missing values. 
+
+```{r}
+# Solution #1
+gapminder %>%
+  filter(year == 1986, 
+         !is.na(life_expectancy)) %>%
+  group_by(continent) %>%
+  summarize(
+    mean_le = mean(life_expectancy),
+    sd_le   = sd(life_expectancy)
+  ) %>%
+  arrange(desc(mean_le))
+
+# Solution #2
+gapminder %>%
+  filter(year == 1986) %>%
+  group_by(continent) %>%
+  summarize(
+    mean_le = mean(life_expectancy, na.rm = TRUE),
+    sd_le   = sd(life_expectancy, na.rm = TRUE)
+  ) %>%
+  arrange(desc(mean_le))
+```
+
+
