@@ -705,13 +705,43 @@ another column called <code>value</code> that stores the value of
 <code>infant_mortality</code> and <code>life_expectancy</code> for each
 country and year.</li>
 </ol>
-<pre class="r"><code># Your code here</code></pre>
+<pre class="r"><code>#head(gapminder)
+library(tidyverse)
+
+gap_long&lt;- gapminder %&gt;%
+  select(country, year, life_expectancy, infant_mortality) %&gt;%
+  pivot_longer(-c(country, year), names_to = &quot;metric&quot;, values_to = &quot;value&quot;)
+head(gap_long)</code></pre>
+<pre><code>## # A tibble: 6 × 4
+##   country  year metric           value
+##   &lt;fct&gt;   &lt;int&gt; &lt;chr&gt;            &lt;dbl&gt;
+## 1 Albania  1960 life_expectancy   62.9
+## 2 Albania  1960 infant_mortality 115. 
+## 3 Algeria  1960 life_expectancy   47.5
+## 4 Algeria  1960 infant_mortality 148. 
+## 5 Angola   1960 life_expectancy   36.0
+## 6 Angola   1960 infant_mortality 208</code></pre>
 <ol start="2" style="list-style-type: decimal">
 <li>Take the long format data frame you just created in question 1 and
 put it back into wide format so that <code>life_expectancy</code> and
 <code>infant_mortality</code> become separate columns again.</li>
 </ol>
-<pre class="r"><code># Your code here</code></pre>
+<pre class="r"><code>gap_long %&gt;% 
+  pivot_wider(names_from = metric, values_from = value)</code></pre>
+<pre><code>## # A tibble: 10,545 × 4
+##    country              year life_expectancy infant_mortality
+##    &lt;fct&gt;               &lt;int&gt;           &lt;dbl&gt;            &lt;dbl&gt;
+##  1 Albania              1960            62.9            115. 
+##  2 Algeria              1960            47.5            148. 
+##  3 Angola               1960            36.0            208  
+##  4 Antigua and Barbuda  1960            63.0             NA  
+##  5 Argentina            1960            65.4             59.9
+##  6 Armenia              1960            66.9             NA  
+##  7 Aruba                1960            65.7             NA  
+##  8 Australia            1960            70.9             20.3
+##  9 Austria              1960            68.8             37.3
+## 10 Azerbaijan           1960            61.3             NA  
+## # ℹ 10,535 more rows</code></pre>
 <ol start="3" style="list-style-type: decimal">
 <li>Using the <code>murders</code> dataset, combine <code>state</code>
 and <code>abb</code> into a new column called <code>state_abb</code>

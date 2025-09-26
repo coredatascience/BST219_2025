@@ -200,14 +200,21 @@ data(gapminder)
 
 1. Using the `gapminder` dataset, keep `country`, `year`, `life_expectancy`, and `infant_mortality`. Convert the data frame to long format with a column called `metric` with values that are either `infant_mortality` or `life_expectancy`, and another column called `value` that stores the value of `infant_mortality` and `life_expectancy` for each country and year. 
 
-```{r}
-# Your code here
+```{r, message=FALSE}
+#head(gapminder)
+library(tidyverse)
+
+gap_long<- gapminder %>%
+  select(country, year, life_expectancy, infant_mortality) %>%
+  pivot_longer(-c(country, year), names_to = "metric", values_to = "value")
+head(gap_long)
 ```
 
 2. Take the long format data frame you just created in question 1 and put it back into wide format so that `life_expectancy` and `infant_mortality` become separate columns again. 
 
 ```{r}
-# Your code here
+gap_long %>% 
+  pivot_wider(names_from = metric, values_from = value)
 ```
 
 3. Using the `murders` dataset, combine `state` and `abb` into a new column called `state_abb` with values that combine the values in the state and abb columns with a hyphen in the middle. For example, `Massachusetts-MA` should be a value in the `state_abb` column. 

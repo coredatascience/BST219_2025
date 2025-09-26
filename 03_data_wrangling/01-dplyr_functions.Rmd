@@ -304,13 +304,22 @@ Only one state in the South has a murder rate above 3: Alabama.
 5. Using the `gapminder` dataset, filter out missing values for `life_expectancy` and compute the mean, median, and standard deviation of life expectancy. 
 
 ```{r}
-# Your code here
+gapminder %>% filter(!is.na(life_expectancy)) %>%
+  summarise(mean_le = mean(life_expectancy),
+            median_le = median(life_expectancy),
+            sd_le = sd(life_expectancy))
 ```
 
 6. Using the `gapminder` dataset, compute the mean and standard deviation of life expectancy by continent for the year 1986. Then sort the continents in descending order according to mean life expectancy. Filter out missing values. 
 
 ```{r}
-# Your code here
+gapminder %>% 
+  filter(year == 1986, 
+         !is.na(life_expectancy)) %>%
+  group_by(continent) %>%
+  summarise(mean_le = mean(life_expectancy),
+            sd_le = sd(life_expectancy)) %>%
+  arrange(desc(mean_le))
 ```
 
 

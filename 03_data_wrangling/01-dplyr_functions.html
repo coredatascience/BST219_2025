@@ -847,7 +847,12 @@ expectancy.</li>
 for <code>life_expectancy</code> and compute the mean, median, and
 standard deviation of life expectancy.</li>
 </ol>
-<pre class="r"><code># Your code here</code></pre>
+<pre class="r"><code>gapminder %&gt;% filter(!is.na(life_expectancy)) %&gt;%
+  summarise(mean_le = mean(life_expectancy),
+            median_le = median(life_expectancy),
+            sd_le = sd(life_expectancy))</code></pre>
+<pre><code>##    mean_le median_le    sd_le
+## 1 64.81162     67.54 10.67249</code></pre>
 <ol start="6" style="list-style-type: decimal">
 <li>Using the <code>gapminder</code> dataset, compute the mean and
 standard deviation of life expectancy by continent for the year 1986.
