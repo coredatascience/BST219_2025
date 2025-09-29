@@ -1,0 +1,60 @@
+---
+title: 'Case Study: Vaccines'
+output: html_document
+---
+
+Vaccines have helped save millions of lives. In the 19th century, before herd immunization was achieved through vaccination programs, deaths from infectious diseases, like smallpox and polio, were common. However, today, despite all the scientific evidence for their importance, vaccination programs have become somewhat controversial.
+
+```{r, message=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(dslabs)
+data(us_contagious_diseases)
+str(us_contagious_diseases)
+```
+
+We create a temporary object `dat` that stores only the Measles data, includes a per 100,000 rate, orders states by average value of disease and removes Alaska and Hawaii since they only became states in the late 1950s.
+
+```{r}
+the_disease <- "Measles"
+dat <- us_contagious_diseases %>%
+       filter(!state %in% c("Hawaii","Alaska") & disease == the_disease) %>%
+       mutate(rate = (count / weeks_reporting) * 52 / (population / 100000)) 
+```
+
+Can we show data for all states in one plot? We have three variables to show: year, state and rate.
+
+When choosing colors to quantify a numeric variable we chose between two options: *sequential* and *diverging*. Sequential colors are suited for data that goes from high to low. High values are clearly distinguished from low values. Here are some examples offered by the package `RColorBrewer`:
+
+```{r}
+library(RColorBrewer)
+display.brewer.all(type = "seq")
+```
+
+Diverging colors are used to represent values that diverge from a center. We put equal emphasis on both ends of the data range: higher than the center and lower than the center. An example of when we would use a divergent pattern would be if we were to show height in standard deviations away from the average. Here are some examples of divergent patterns:
+
+```{r}
+library(RColorBrewer)
+display.brewer.all(type="div")
+```
+
+In our example we want to use a sequential palette since there is no meaningful center, just low and high rates.
+
+### `geom-tile`
+
+We use the geometry `geom_tile` to tile the region with colors representing disease rates. We use a square root transformation to avoid having the really high counts dominate the plot.
+
+```{r}
+dat %>% ggplot(aes(year, state,  fill = rate)) +
+        geom_tile(color = "grey50") +
+        scale_x_continuous(expand = c(0,0)) +
+        scale_fill_gradientn(colors = brewer.pal(9, "Reds"), trans = "sqrt") +
+        geom_vline(xintercept = 1963, col = "blue") +
+        theme_minimal() +  theme(panel.grid = element_blank()) +
+        ggtitle(the_disease) + 
+        ylab("") + 
+        xlab("")
+```
+
+This plot makes a very striking argument for the contribution of vaccines. However, one limitation of this plot is that it uses color to represent quantity which we earlier explained makes it a bit harder to know exactly how high it is going. Position and length are better cues. If we are willing to lose state information, we can make a version of the plot that shows the values with position.
+
