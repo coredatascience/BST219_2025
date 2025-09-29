@@ -1,0 +1,60 @@
+---
+title: "Coding question of the day"
+output: html_document
+---
+
+## Sep 25, 2025
+
+Using the gapminderdataset, calculate the mean fertility rate by region for the year 2015. Which 10 regions had the largest fertility rates that year? Assume there is no missing data. The following steps may be helpful.
+
+1. Filter the data to only include the year 2015
+2. Group by region
+3. Calculate the average fertility rate for each region
+4. Display the top 10 fertility rates (i.e., the 10 largest fertility rates)
+
+```{r, message=FALSE}
+library(dslabs)
+library(dplyr)
+data(gapminder)
+
+gap_2015 <- gapminder %>%
+  filter(year == 2015) %>%
+  group_by(region) %>%
+  summarise(avg_fertility = mean(fertility)) %>%
+  arrange(desc(avg_fertility))
+
+gap_2015
+```
+
+---
+
+## Sep 30, 2025
+
+Using the `gapminder` dataset, for the year 2000, add a column to the dataset called `high_life_exp` that is equal to 1 if the life expectancy is above 70 years of age and 0 otherwise. 
+
+How many countries had a life expectancy above 70 years in 2000? What percentage of countries included in this dataset is this?
+
+Hint: it might be helpful to use the `ifelse` function. 
+
+```{r, message=FALSE}
+library(dslabs)
+library(dplyr)
+data(gapminder)
+```
+
+
+---
+
+## Oct 2, 2025
+
+Using the `gapminder` dataset and `ggplot2`, for the year 1986, plot `fertility` on the x-axis and `life_expectancy` on the y-axis. Color the points according to `continent`, and make the size of the points correspond to the population of the country. Update the x and y axis labels to make them more informative. Hint: the arguments color and size will be useful inside of ggplot. Note: you will most likely get ugly legends - don't worry about that right now.
+
+```{r, message=FALSE}
+library(dslabs)
+library(dplyr)
+library(ggplot2)
+data(gapminder)
+```
+
+
+---
