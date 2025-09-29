@@ -19,7 +19,7 @@ Dr. Heather Mattie
 
 | Day      | Time | Location     |
 | :---     |    :----   |    :--- |
-| Monday | 10-11am | FXB G10 |
+| Monday | 10-11am | Zoom |
 | Tuesday | 1-2pm | Heather's office (Building 1, 4th floor, room 421A) |
 | Wednesday | 2:30-3:30pm | Kresge 201, except 10/1 in Kresge 502 |
 | Thursday | 12-1pm | Kresge 205 |
