@@ -166,7 +166,7 @@ library(lubridate)
 ```{r}
 dates <- c("09-03-12", "12-4-9", "0610, 03", "Made on 27 6 1920")
 
-# Your code here
+dmy(dates)
 ```
 
 2. Create a data frame with columns `clean_dates`, `month`, `day` and `year` from the string of dates in question 1.
