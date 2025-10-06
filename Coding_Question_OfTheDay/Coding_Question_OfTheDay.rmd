@@ -56,5 +56,23 @@ library(ggplot2)
 data(gapminder)
 ```
 
+```{r}
+gapminder %>% filter(year == 1986) %>%
+  ggplot() +
+  geom_point(aes(x = fertility, 
+                 y = life_expectancy,
+                 color = continent,
+                 size = population)) +
+  xlab("Fertility") +
+  ylab("Life Expectancy")
+```
+
+
+
+
+
+
+
+
 
 ---
