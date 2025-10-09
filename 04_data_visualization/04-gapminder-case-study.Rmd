@@ -1,0 +1,676 @@
+---
+title: 'Gapminder Case Study'
+output: 
+  html_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+In this section we will demonstrate how relatively simple `ggplot` code can create insightful and aesthetically pleasing plots that help us better understand trends in world health and economics. We later augment the code somewhat to perfect the plots and describe some general principles for data visualization.
+
+## Example 1: Life Expectancy and Fertility Rates
+
+[Hans Rosling](https://en.wikipedia.org/wiki/Hans_Rosling) was the co-founder of the [Gapminder Foundation](http://www.gapminder.org/), an organization dedicated to educating the public by using data to dispel common myths about the so-called developing world. The organization uses data to show how actual trends in health and economics contradict the narratives that emanate from sensationalist media coverage of catastrophes, tragedies and other unfortunate events. As stated on the Gapminder Foundation's website:
+
+>>> Journalists and lobbyists tell dramatic stories. That’s their job. They tell stories about extraordinary events and unusual people. The piles of dramatic stories pile up in peoples' minds into an over-dramatic worldview and strong negative stress feelings: "The world is getting worse!", "It’s we vs. them!”, “Other people are strange!", "The population just keeps growing!" and "Nobody cares!"
+
+Hans Rosling conveyed actual data-based trends in a dramatic way of his own, using effective data visualization. This section is based on two talks that exemplify this approach to education: [New Insights on Poverty](https://www.ted.com/talks/hans_rosling_reveals_new_insights_on_poverty?language=en) and [The Best Stats You've Ever Seen](https://www.ted.com/talks/hans_rosling_shows_the_best_stats_you_ve_ever_seen). Specifically, in this section, we set out to answer the following two questions using data:
+
+1. Is it a fair characterization of today's world to say it is divided into western rich nations and the developing world in Africa, Asia and Latin America? 
+2. Has income inequality across countries worsened during the last 40 years? 
+
+To answer these questions we will be using the `gapminder` dataset provided in `dslabs`. This dataset was created using a number of spreadsheets available from the [Gapminder](http://www.gapminder.org/) Foundation. You can access the table like this:
+
+```{r load libraries,message=FALSE,echo=TRUE}
+library(dslabs)
+data(gapminder)
+head(gapminder)
+```
+
+#### Hans Rosling's Quiz
+
+As done in the _New Insights on Poverty_ video, we start by testing our knowledge regarding differences in child mortality across different countries. 
+
+For each of the six pairs of countries below, which country do you think had the highest child mortality in 2015? Which pairs do you think are most similar?
+
+1. Sri Lanka or Turkey
+2. Poland or South Korea
+3. Malaysia or Russia
+4. Pakistan or Vietnam
+5. Thailand or South Africa
+
+When answering these questions without data, the non-European countries are typically picked as having higher mortality rates: Sri Lanka over Turkey, South Korea over Poland, and Malaysia over Russia. It is also common to assume that countries considered to be part of the developing world, Pakistan, Vietnam, Thailand and South Africa, have similarly high mortality rates. 
+
+To answer these questions __with data__ we can use `dplyr`. For example, for the first comparison we see that Turkey has the higher rate. 
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+gapminder %>% filter(year == 2015 & country %in% c("Sri Lanka","Turkey")) %>% 
+              select(country, infant_mortality)
+```
+
+
+We can use this code on all comparisons and find the following:
+```{r, echo = FALSE, warning=FALSE, message=FALSE}
+comp_table <- tibble(comparison = rep(1:5, each = 2),
+              country = c("Sri Lanka", "Turkey", "Poland", "South Korea", "Malaysia", "Russia", "Pakistan","Vietnam","Thailand","South Africa"))
+
+tmp <- gapminder %>% filter(year == 2015) %>% 
+                     select(country, infant_mortality) %>% 
+                     mutate(country = as.character(country)) ##to match characters to characters
+  
+tab <- inner_join(comp_table, tmp, by = "country") %>% select(-comparison)
+  
+bind_cols(slice(tab,seq(1,9,2)), slice(tab,seq(2,10,2))) %>% knitr::kable(col.names = c('Country_1', 'Infant_Mortality_1', 'Country_2', 'Infant_Mortality_2'))
+```
+
+We see that the European countries have higher rates: Poland has a higher rate than South Korea, and Russia has a higher rate than Malaysia. We also see that Pakistan has a much higher rate than Vietnam and South Africa a much higher rate than Thailand. It turns out that most people do worse if they are guessing, which implies we are more than ignorant, we are misinformed. 
+
+### Life expectancy and fertility rates
+
+The reason for this stems from the preconceived notion that the world is divided into two groups: the western world (Western Europe and North America), characterized by long life spans and small families, versus the developing world (Africa, Asia, and Latin America) characterized by short life spans and and large families. But, does the data support this dichotomous view of two groups?
+
+The necessary data to answer this question is also available in our `gapminder` table. Using our newly learned data visualization skills we will be able to answer this question.
+
+The first plot we make to see what data have to say about this world view is a scatter plot of life expectancy versus fertility rates (average number of children per woman).  We will start by looking at data from about 50 years ago, when perhaps this view was cemented in our minds.
+
+```{r, warning=FALSE}
+ds_theme_set()
+
+gapminder %>% filter(year == 1962) %>%
+  ggplot(aes(fertility, life_expectancy)) +
+  geom_point() +
+  ylab("Life expectancy (years)") + 
+  xlab("Fertility (avg number of children per woman)")
+```
+
+Most points fall into two distinct categories: 
+
+1. Life expectancy around 70 years and 3 or less children per family
+2. Life expediencies lower then 65 years and with more than 5 children per family. 
+
+To confirm that indeed these countries are from the regions we expect, we can use color to represent continent. 
+
+```{r}
+filter(gapminder, year == 1962) %>%
+  ggplot(aes(fertility, life_expectancy, color = continent)) +
+  geom_point() +
+  xlab("Fertility (avg number of children per woman)") +
+  ylab("Life expectancy (years)") + 
+  scale_color_discrete(name = "Continent")
+```
+
+So in 1962, "the west versus developing world" view was grounded in some reality. But is this still the case 50 years later?
+
+### Faceting
+
+We could easily plot the 2012 data in the same way we did for 1962. But to compare, side by side plots are preferable. In `ggplot` we can achieve this by _faceting variables_: we stratify the data by some variable and make the same plot for each stratum. 
+
+To achieve faceting we add a layer with the function `facet_grid`, which automatically separates the plots. This function lets you facet by up to two variables using columns to represent one variable and rows to represent the other. The function expects the row and column variables separated by a `~`. Here is an example of a scatter plot with `facet_grid` added as the last layer:
+
+```{r, warning=FALSE}
+gapminder %>% filter(year %in% c(1962, 2012)) %>%
+  ggplot(aes(fertility, life_expectancy, color = continent)) +
+  geom_point() +
+  facet_grid(continent~year) +
+  xlab("Fertility (avg number of children per woman)") +
+  ylab("Life expectancy (years)") + 
+  scale_color_discrete(name = "Continent")
+```
+
+We see a plot for each continent/year pair. However, this is just an example, and more than what we want, which is simply to compare 1962 and 2012. In this case, there is just one variable and we use `.` to let facet know that we are not using one of the variables:
+
+```{r, warning=FALSE}
+filter(gapminder, year %in% c(1962, 2012)) %>%
+  ggplot(aes(fertility, life_expectancy, color = continent)) +
+  geom_point() +
+  facet_grid(. ~ year) +
+  xlab("Fertility (avg number of children per woman)") +
+  ylab("Life expectancy (years)") + 
+  scale_color_discrete(name = "Continent")
+```
+
+This plot clearly shows that the majority of countries have moved from the _developing world_ cluster to the _western world_ one. In 2012, the western versus developing world view no longer makes sense. This is particularly clear when comparing Europe to Asia, which includes several countries that have made great improvements. 
+
+#### `facet_wrap`
+
+To explore how this transformation happened through the years, we can make the plot for several years. For example we can add 1970, 1980, 1990, and 2000. If we do this, we will not want all the plots on the same row, the default behavior of `facet_grid`, as they will become too thin to show the data. Instead we will want to use multiple rows and columns. The function `facet_wrap` permits us to do this, as it automatically wraps the series of plots so that each display has viewable dimensions:
+
+
+```{r}
+years <- c(1962, 1970, 1980, 1990, 2000)
+continents <- c("Europe", "Asia")
+gapminder %>% 
+  filter(year %in% years & continent %in% continents) %>%
+  ggplot(aes(fertility, life_expectancy, color = continent)) +
+  geom_point() +
+  facet_wrap(. ~ year)  +
+  xlab("Fertility (avg number of children per woman)") +
+  ylab("Life expectancy (years)") + 
+  scale_color_discrete(name = "Continent")
+```
+
+This plot clearly shows how most Asian countries have improved at a much faster rate than European ones.
+
+### Fixed scales for better comparisons
+
+Note that the default choice of the range of the axes is an important one. When not using `facet`, this range is determined by the the data shown in the plot. When using `facet`, this range is determined by the data shown in all plots and therefore kept fixed across plots. This makes comparisons across plots much easier. For example, in the plot above we see that life expectancy has increased and the fertility has decreased across most countries. We see this because the cloud of points moves. This is not the case if we don't adjust the scales:
+
+```{r, warning=FALSE, message = FALSE, echo=FALSE}
+library(gridExtra)
+p1 <- filter(gapminder, year == 1962) %>%
+  ggplot(aes(fertility, life_expectancy, col = continent)) +
+  geom_point()  +
+  xlab("Fertility (avg number of children per woman)") +
+  ylab("Life expectancy (years)") + 
+  scale_color_discrete(name = "Continent")
+
+p2 <- filter(gapminder, year == 2012) %>%
+  ggplot(aes(fertility, life_expectancy, col = continent)) +
+  geom_point()  +
+  xlab("Fertility (avg number of children per woman)") +
+  ylab("Life expectancy (years)") + 
+  scale_color_discrete(name = "Continent")
+
+grid.arrange(p1, p2, ncol = 2)
+```
+
+In the plot above we have to pay special attention to the range to notice that the plot on the right has larger life expectancy.
+
+### Time Series Plots
+
+The visualizations above effectively illustrate that data no longer support the western versus developing world view. Once we see these plots new questions emerge. For example, which countries are improving more, which ones less? Was the improvement constant during the last 50 years or was there more accelerated improvement during certain periods? For a closer look that may help answer these questions, we introduce _time series plots_.
+
+Time series plots have time on the x-axis and an outcome or measurement of interest on the y-axis. For example, here is a trend plot for the United States fertility rates:
+
+```{r, warning=FALSE}
+gapminder %>% filter(country == "United States") %>% 
+  ggplot(aes(year, fertility)) +
+  geom_point() +
+  xlab("Year") +
+  ylab("Fertility (avg number of children per woman)")
+```
+
+We see that the trend is not linear at all. Instead we see a sharp drop during the 60s and 70s to below 2. Then the trend comes come back to 2 and stabilizes during the 90s.
+
+When the points are regularly and densely spaced, as they are here, we create curves by joining the points with lines, to convey that these data are from a single country. To do this we use the `geom_line` function instead of `geom_point`. 
+
+```{r, warning=FALSE}
+gapminder %>% filter(country == "United States") %>% 
+  ggplot(aes(year, fertility)) +
+  geom_line() +
+  #geom_point() +
+  xlab("Year") +
+  ylab("Fertility (avg number of children per woman)")
+```
+
+This is particularly helpful when we look at two countries. If we subset the data to include two countries, one from Europe and one from Asia, then copy the code above:
+
+```{r, warning=FALSE}
+countries <- c("South Korea", "Germany")
+gapminder %>% filter(country %in% countries) %>% 
+  ggplot(aes(year,fertility)) +
+  geom_line() +
+  xlab("Year") +
+  ylab("Fertility (avg number of children per woman)")
+```
+
+Note that this is __not__ the plot that we want. Rather than a line for each country, the points for both countries are joined. This is actually expected since we have not told `ggplot` anything about wanting two separate lines. To let `ggplot` know that there are two curves that need to be made separately, we assign each point to a `group`, one for each country:
+
+
+```{r, warning=FALSE}
+countries <- c("South Korea", "Germany")
+gapminder %>% filter(country %in% countries) %>% 
+  ggplot(aes(year, fertility, group = country)) +
+  geom_line() +
+  xlab("Year") +
+  ylab("Fertility (avg number of children per woman)")
+```
+
+But which line goes with which country? We can assign colors to make this distinction.
+A useful side-effect of using the `color` argument to assign different colors to the different countries is that the data is automatically grouped:
+
+```{r, warning=FALSE}
+countries <- c("South Korea", "Germany")
+gapminder %>% filter(country %in% countries) %>% 
+  ggplot(aes(year, fertility, color = country)) +
+  geom_line() +
+  xlab("Year") +
+  ylab("Fertility (avg number of children per woman)") + 
+  scale_color_discrete(name = "Country")
+```
+
+The plot clearly shows how South Korea's fertility rate dropped drastically during the 60s and 70s and by 1990 had a similar rate to Germany.
+
+#### We prefer labels over legends
+
+For trend plots we recommend labeling the lines rather than using legends as the viewer can quickly see which line is which country. This suggestion actually applies to most plots: labeling is usually preferred over legends.
+
+We demonstrate how we can do this using the fertility data. We define a data table with the label locations and then use a second mapping just for these labels:
+
+```{r}
+labels <- data.frame(country = countries, x = c(1975, 1965), y = c(5, 2.75))
+
+gapminder %>% filter(country %in% countries) %>% 
+  ggplot(aes(year, fertility, color = country)) +
+  geom_line() +
+  geom_text(data = labels, aes(x, y, label = country), size = 5) +
+  theme(legend.position = "none") +
+  xlab("Year") +
+  ylab("Fertility (avg number of children per woman)")
+```
+
+
+
+## Example 2: Income Distribution
+
+Another commonly held notion is that wealth distribution across the world has become worse during the last several decades. When general audiences are asked if poor countries have become poorer and rich countries become richer, the majority answer yes. By using stratification, histograms, smooth densities, and boxplots we will be able to understand if this is in fact the case. We will also learn how transformations can sometimes help provide more informative summaries and plots.
+
+### Transformations
+
+The `gapminder` data table includes a column with the countries gross domestic product (GDP). GDP measures the market value of goods and services produced by a country in a year. The GDP per person is often used as a rough summary of how rich a country is. Here we divide this quantity by 365 to obtain the more interpretable measure _dollars per day_.  Using current US dollars as a unit, a person surviving on an income of less than $2  a day is defined to be living in _absolute poverty_. We add this variable to the data table:
+
+
+```{r}
+gapminder <- gapminder %>% 
+  mutate(dollars_per_day = gdp/population/365)
+```
+
+Note that the GDP values are adjusted for inflation and represent current US dollars, so these values are meant to be comparable across the years. Also note that these are country averages and that within each country there is much variability. All the graphs and insights described below relate to country averages and not to individuals.
+
+
+#### Country income distribution
+
+Here is a histogram of per day incomes from 1970:
+
+```{r}
+past_year <- 1970
+gapminder %>% 
+  filter(year == past_year & !is.na(gdp)) %>%
+  ggplot(aes(dollars_per_day)) + 
+  geom_histogram(binwidth = 1, color = "black", fill = "blue") +
+  xlab("Dollars per day") +
+  ylab("Number of countries")
+```
+
+We use the `color = "black"` argument to draw a boundary and clearly distinguish the bins.
+
+In this plot we see that for the majority of countries, averages are
+below \$10 a day. However, the majority of the x-axis is dedicated to the `r library(tidyverse); filter(gapminder, year == past_year & !is.na(gdp)) %>% summarise(x = sum(dollars_per_day>10)) %>% .$x` countries with averages above \$10. So the plot is not very informative about countries with values below \$10 a day.
+
+It might be more informative to quickly be able to see how many countries have average daily incomes of about $1 (extremely poor), \$2 (very poor), \$4 (poor), \$8 (middle), \$16 (well off), \$32 (rich), \$64 (very rich) per day. These changes are multiplicative and log transformations change multiplicative changes into additive ones: when using base 2, a doubling of a value turns into an increase by 1. 
+
+Here is the distribution if we apply a log base 2 transformation:
+```{r}
+gapminder %>% 
+  filter(year == past_year & !is.na(gdp)) %>%
+  ggplot(aes(log2(dollars_per_day))) + 
+  geom_histogram(binwidth = 1, color = "black") +
+  xlab("Dollars per day (log2 scale)") +
+  ylab("Number of countries")
+```
+
+In a way this provides a _close up_ of the mid to lower income countries.
+
+#### Which base?
+
+In the case above we used base 2 in the log transformations. Other common choices are base $e$ (the natural log) and base 10.
+
+In general, we do not recommend using the natural log for data exploration and visualization. This is because while $2^2, 2^3, 2^4, \dots$ or $10^1, 10^2, \dots$ are easy to compute in our heads, the same is not true for  $\mathrm{e}^2, \mathrm{e}^3, \dots$. 
+
+In the dollars per day example, we used base 2 instead of base 10 because the resulting range is easier to interpret. The range of the values being plotted is (`r with(filter(gapminder, year==past_year), range(dollars_per_day, na.rm=TRUE))`). 
+
+In base 10 this turns into a range that includes very few integers: just 0 and 1. 
+With base two, our range includes -2, -1, 0, 1, 2, 3, 4 and 5. It is easier to compute $2^x$ and $10^x$ when $x$ is an integer and between -10 and 10, so we prefer to have more small integers on the scale. Another consequence of a limited range is that choosing the binwidth is more challenging. With log base 2, we know that a binwidth of 1 will translate to a bin with range $x$ to $2x$.
+
+As an example in which base 10 makes more sense consider population sizes. A log base 10 makes more sense since the range for these is about 1,000 to 10 billion. Here is the histogram of the transformed values:
+
+```{r}
+gapminder %>% filter(year == past_year) %>%
+  ggplot(aes(log10(population))) +
+  geom_histogram(binwidth = 0.5, color = "black") +
+  xlab("Population (log10 scale)") +
+  ylab("Number of countries")
+```
+
+Here we quickly see that country populations range between ten thousand and ten billion.
+
+#### Transform the values or the scale?
+
+There are two ways we can use log transformations in plots. We can log the values before plotting them or use log scales in the axes. Both approaches are useful and have different strengths. If we log the data we can more easily interpret intermediate values in the scale. For example, if we see  
+
+>> ----1----x----2--------3----
+
+for log transformed data we know that the value of $x$ is about 1.5. If the scales are logged
+
+>> ----1----x----10------100---
+
+then, to determine `x`, we need to compute $10^{1.5}$, which is not easy to do in our heads. However, the advantage of showing logged scales is that the original values are displayed in the plot, which are easier to interpret. For example, we would see "32 dollars a day" instead of "5 log base 2 dollar a day".
+
+As we learned earlier, if we want to scale the axis with logs we can use the `scale_x_ccontinuous` function. So instead of logging the values first, we apply this layer:
+
+```{r}
+gapminder %>% 
+  filter(year == past_year & !is.na(gdp)) %>%
+  ggplot(aes(dollars_per_day)) + 
+  geom_histogram(binwidth = 1, color = "black") +
+  scale_x_continuous(trans = "log2") +
+  xlab("Dollars per day") +
+  ylab("Number of countries")
+```
+
+Note that the log base 10 transformation has it's own function: `scale_x_log10()`, but currently base 2 does not. Although we could easily define our own.
+
+Note that there are other transformations avaiable through the `trans` argument. As we learn later on, the square root (`sqrt`) transformation, for example, is useful when considering counts. The logistic transformation (`logit`) is useful when plotting proportions between 0 and 1. The `reverse` transformation is useful when we want smaller values to be on the right or on top.
+
+### Modes
+
+The above plot show two "bumps". In statistics, these bumps are sometimes referred to as _modes_. The mode of a distribution is the value with the highest frequency. The mode of the normal distribution is the average. When a distribution, like the one above, doesn't monotonically decrease from the mode we call the locations where it goes up and down again local modes and say that the distribution has multiple modes.
+
+The histogram above suggests that the 1970 country income distribution has two modes: one at about 2 dollars per day (1 in the log 2 scale) and another at about 32 dollars per day (5 in the log 2 scale). This _bimodality_ is consistent with a dichotomous world made up of countries with average incomes less than $8 (3 in the log 2 scale) a day and countries above that. 
+
+## Ecological Fallacy
+
+Throughout this section we have been comparing regions of the world. We have seen that on average, some regions do better than others. Now we focus on describing the importance of variability within the groups. 
+
+Here we will focus on the relationship between country child survival rates and average income. We start by comparing these quantities across regions. We define a few more regions:
+
+```{r}
+present_year <- 2010
+past_year <- 1970
+
+west <- c("Western Europe","Northern Europe","Southern Europe",
+          "Northern America","Australia and New Zealand")
+
+gapminder <- gapminder %>% 
+  mutate(group = case_when(
+    region %in% west ~ "The West",
+    region %in% "Northern Africa" ~ "Northern Africa",
+    region %in% c("Eastern Asia", "South-Eastern Asia") ~ "East Asia",
+    region == "Southern Asia"~ "Southern Asia",
+    region %in% c("Central America", "South America", "Caribbean") ~ "Latin America",
+    continent == "Africa" & region != "Northern Africa" ~ "Sub-Saharan Africa",
+    region %in% c("Melanesia", "Micronesia", "Polynesia") ~ "Pacific Islands"))
+```
+
+We then compute these quantities for each region. 
+
+```{r, message=FALSE}
+surv_income <- gapminder %>% 
+  filter(year %in% present_year & !is.na(gdp) & !is.na(infant_mortality) & !is.na(group)) %>%
+  group_by(group) %>%
+  summarize(income = sum(gdp)/sum(population)/365,
+            infant_survival_rate = 1-sum(infant_mortality/1000*population)/sum(population)) 
+
+surv_income %>% arrange(income)
+```
+
+This shows a dramatic difference. While in the west less than 0.5% children die, in Sub-Saharan Africa the rate is higher than 6%! The relationship between these two variables is almost perfectly linear. 
+
+```{r}
+surv_income %>% ggplot(aes(income, infant_survival_rate, label = group, color = group)) +
+  scale_x_continuous(trans = "log2", limit = c(0.25, 150)) +
+  scale_y_continuous(trans = "logit", limit = c(0.875, .9981), 
+                     breaks = c(.85,.90,.95,.99,.995,.998)) +
+  geom_label(size = 3, show.legend = FALSE) +
+  xlab("Dollars per day") +
+  ylab("Infant survival rate")
+```
+
+In this plot we introduce the use of the `limit` argument  which lets us change the range of the axes. We are making the range larger than the data needs because we will later compare this plot to one with more variability and we want the ranges to be the same. We also introduce the `breaks` argument which lets us set the location of the axis tick labels. Finally we introduce a new transformation, the logistic transformation.
+
+#### Logistic transformation
+The logistic or logit transformation for a proportion or rate $p$ is defined as 
+
+$$f(p) = \log \left( \frac{p}{1-p} \right)$$
+
+
+When $p$ is a proportion or probability, the quantity that is being logged, $p/(1-p)$ is called the _odds_. In this case $p$ is the proportion of children that survived. The odds tell us how many more children are expected to survive than to die. The log transformation makes this symmetric. If the rates are the same, then the log odds is 0. Fold increases or decreases turn into positive and negative increments respectively.
+
+This scale is useful when we want to highlight differences near 0 or 1. For survival rates this is important because a survival rate of 90% is unacceptable, while a survival of 99% is relatively good. We would much prefer a survival rate closer to 99.9%. We want our scale to highlight these differences and the logit does this. Note that 99.9/0.1 is about 10 times bigger than 99/1 which is about 10 times larger than 90/10. And by using the log, these fold changes turn into constant increases.
+
+### Show the data
+
+Now, back to our plot. Based on the plot above, do we conclude that a country with a low income is destined to have low survival rate? Do we conclude that all survival rates in Sub-Saharan Africa are all lower than in Southern Asia which in turn are lower than in the Pacific Islands, and so on?
+
+Jumping to this conclusion based on a plot showing averages is referred to as the _ecological fallacy_. The almost perfect relationship between survival rates and income is only observed for the averages at the region level. Once we show all the data we see a somewhat more complicated story:
+
+```{r}
+library(ggrepel)
+highlight <- c("Sierra Leone", "Mauritius",  "Sudan", "Botswana", "Tunisia",
+               "Cambodia","Singapore","Chile", "Haiti", "Bolivia",
+               "United States","Sweden", "Angola", "Serbia")
+
+gapminder %>% filter(year %in% present_year & !is.na(gdp) & !is.na(infant_mortality) & !is.na(group) ) %>%
+  ggplot(aes(dollars_per_day, 1 - infant_mortality/1000, color = group, label = country)) +
+  scale_x_continuous(trans = "log2", limits=c(0.25, 150)) +
+  scale_y_continuous(trans = "logit",limit=c(0.875, .9981),
+                     breaks=c(.85,.90,.95,.99,.995,.998)) + 
+  geom_point(alpha = 0.5, size = 3) +
+  geom_text_repel(size = 4, show.legend = FALSE,
+    data = filter(gapminder, (year %in% present_year) & (country %in% highlight))) +
+  xlab("Dollars per day") +
+  ylab("Infant survival rate") +
+  scale_color_discrete(name = "Region")
+```
+
+Specifically, we see that there is a large amount of variability. We see that countries from the same regions can be quite different and that countries with the same income can have different survival rates. For example, while on average, Sub-Saharan Africa had the worse health and economic outcomes, there is wide variability within that group. For example, note that Mauritius and Botswana are doing better than Angola and Sierra Leone with Mauritius comparable to Western countries.
+
+
+## Self-Assessment Questions
+
+1. Using the `gapminder` dataset make a histogram of `fertility` rates across all countries in 1980. Use 20 bins, and make the bars orange with an outline color of turquoise.
+
+```{r}
+# Your code here
+```
+
+2. Load the [`airquality` dataset](https://www.rdocumentation.org/packages/datasets/versions/3.6.2/topics/airquality) that is part of base R. Plot `Ozone` (y-axis) vs `Temp` (x-axis), color by `Month` (as a factor). Add informative axis labels and a title.
+
+```{r}
+# Your code here
+```
+
+3. Now make the scatterplot `Ozone` (y) vs `Wind` (x) and facet by `Month` in a single row using `facet_grid(. ~ Month)`. 
+
+```{r}
+# Your code here
+```
+
+
+4. Now create a boxplot of `Temp` for each month. Which month had the highest median temperature?
+
+```{r}
+# Your code here
+```
+
+July had the highest median temperature. 
+
+5. Plot two histograms of `Solar.R` (solar radiation); the first with the raw data and the second on the log10 scale. Which plot do you think presents the data better?
+
+```{r, warning=FALSE, message=FALSE}
+# Your code here
+```
+
+There doesn't seem to be a strong reason to use the log transformation here, so the plot with the raw data values presents the data better. 
+
+6. Using the `economics` dataset from the `ggplot2` package, plot unemployment (`unemploy`) over time (`Date`) (a) with points and (b) with lines. Briefly note which is better for dense, regular time series.
+
+```{r}
+# Your code here
+```
+
+Lines usually communicate trends better for dense, ordered time series.
+
+7. Using the `economics_long` dataset from the `ggplot2` package, plot two time series line graphs - one for `unemploy` and one for `psavert` - over time. Use `facet_wrap` to plot them on separate y axes. Be sure to filter to just those two variables first. Note: you'll need to add the following arguments to `facet_wrap`: `, scales = "free_y", ncol = 1`. This will ensure each plot has an appropriate scale and that the plots are stacked vertically.  
+
+```{r}
+# Your code here
+```
+
+8. Using the `airquality` dataset, compute, by `Month`, the proportion of "high-ozone days" (`Ozone` >= 100). Plot mean `Temp` (x) vs proportion high-ozone (y).
+
+```{r}
+# Your code here
+```
+
+
+
+## Self-Assessment Solutions
+
+1. Using the `gapminder` dataset make a histogram of `fertility` rates across all countries in 1980. Use 20 bins, and make the bars orange with an outline color of turquoise.
+
+```{r}
+library(dslabs)
+library(tidyverse)
+data(gapminder)
+
+gapminder %>% filter(year == 1980) %>%
+  ggplot(aes(x = fertility)) +
+  geom_histogram(fill = "orange", 
+                 color = "turquoise", 
+                 bins = 20) +
+  xlab("Fertility") +
+  ylab("Number of countries")
+```
+
+2. Load the [`airquality` dataset](https://www.rdocumentation.org/packages/datasets/versions/3.6.2/topics/airquality) that is part of base R. Plot `Ozone` (y-axis) vs `Temp` (x-axis), color by `Month` (as a factor). Add informative axis labels and a title.
+
+```{r}
+data("airquality")
+
+airquality %>% 
+  mutate(Month = factor(Month, labels = month.abb[5:9])) %>%
+  ggplot(aes(Temp, Ozone, color = Month)) +
+  geom_point() +
+  labs(title = "Ozone vs Temperature (NYC, 1973)",
+       x = "Temperature (F)", 
+       y = "Ozone (ppb)", 
+       color = "Month")
+```
+
+3. Now make the scatterplot `Ozone` (y) vs `Wind` (x) and facet by `Month` in a single row using `facet_grid(. ~ Month)`. 
+
+```{r}
+airquality %>% 
+  mutate(Month = factor(Month, labels = month.abb[5:9])) %>%
+  ggplot(aes(Wind, Ozone, color = Month)) +
+  geom_point() +
+  facet_grid(. ~ Month) +
+  labs(title = "Ozone vs Wind across months (NYC, 1973)",
+       x = "Wind (mph)", 
+       y = "Ozone (ppb)") +
+  guides(color = "none") # Remove legend for color since not needed
+```
+
+
+4. Now create a boxplot of `Temp` for each month. Which month had the highest median temperature?
+
+```{r}
+airquality %>% 
+  mutate(Month = factor(Month, labels = month.abb[5:9])) %>%
+  ggplot(aes(y = Temp, x = Month, color = Month)) +
+  geom_boxplot() +
+  labs(title = "Temperarture across months (NYC, 1973)",
+       y = "Temperature (F)") +
+  guides(color = "none") # Remove legend for color since not needed
+```
+
+July had the highest median temperature. 
+
+5. Plot two histograms of `Solar.R` (solar radiation); the first with the raw data and the second on the log10 scale. Which plot do you think presents the data better?
+
+```{r, warning=FALSE, message=FALSE}
+library(gridExtra)
+
+# Raw scale
+g1 <- airquality %>%
+  ggplot(aes(Solar.R)) +
+  geom_histogram(color = "black", 
+                 fill = "steelblue", 
+                 na.rm = TRUE) +
+  labs(title = "Solar Radiation (raw)", 
+       x = "Solar.R", 
+       y = "Count")
+
+# Log10 scale (scale, not transformed data)
+g2 <- airquality %>%
+  ggplot(aes(Solar.R)) +
+  geom_histogram(color = "black", 
+                 fill = "tan", 
+                 na.rm = TRUE) +
+  scale_x_log10() +
+  labs(title = "Solar Radiation (log10 x-scale)",
+       x = "Solar.R (log10 scale)", 
+       y = "Count")
+
+grid.arrange(g1, g2, nrow = 1)
+```
+
+There doesn't seem to be a strong reason to use the log transformation here, so the plot with the raw data values presents the data better. 
+
+6. Using the `economics` dataset from the `ggplot2` package, plot unemployment (`unemploy`) over time (`Date`) (a) with points and (b) with lines. Briefly note which is better for dense, regular time series.
+
+```{r}
+data(economics, package = "ggplot2")
+
+# (a) Points
+p_pts <- ggplot(economics, aes(date, unemploy)) +
+  geom_point() +
+  labs(title = "US Unemployment (points)", x = "Date", y = "Unemployed (thousands)")
+
+# (b) Lines
+p_lin <- ggplot(economics, aes(date, unemploy)) +
+  geom_line() +
+  labs(title = "US Unemployment (line)", x = "Date", y = "Unemployed (thousands)")
+
+grid.arrange(p_pts, p_lin)
+```
+
+Lines usually communicate trends better for dense, ordered time series.
+
+7. Using the `economics_long` dataset from the `ggplot2` package, plot two time series line graphs - one for `unemploy` and one for `psavert` - over time. Use `facet_wrap` to plot them on separate y axes. Be sure to filter to just those two variables first. Note: you'll need to add the following arguments to `facet_wrap`: `, scales = "free_y", ncol = 1`. This will ensure each plot has an appropriate scale and that the plots are stacked vertically.  
+
+```{r}
+data(economics_long, package = "ggplot2")
+
+econ2 <- economics_long %>% 
+  filter(variable %in% c("unemploy", "psavert"))
+
+econ2 %>% 
+  ggplot(aes(date, value, color = variable)) +
+  geom_line() +
+  facet_wrap(~ variable) +
+  labs(title = "Two series over time (faceted)", 
+       x = "Date", 
+       y = "Value", 
+       color = "Series")
+```
+
+8. Using the `airquality` dataset, compute, by `Month`, the proportion of "high-ozone days" (`Ozone` >= 100). Plot mean `Temp` (x) vs proportion high-ozone (y).
+
+```{r}
+prop_tbl <- airquality %>%
+  mutate(high_oz = !is.na(Ozone) & Ozone >= 100,
+         Month = as.integer(Month)) %>%
+  group_by(Month) %>%
+  summarise(prop_high = mean(high_oz, na.rm = TRUE),
+            mean_temp = mean(Temp, na.rm = TRUE))
+
+prop_tbl
+
+prop_tbl %>% 
+  ggplot(aes(mean_temp, prop_high, label = month.abb[5:9], color = Month)) +
+  geom_point(size = 3) +
+  geom_text(vjust = 1.5) +
+  theme(legend.position = "none") +
+  labs(title = "Mean temperature vs proportion of high-ozone days",
+       x = "Mean Temp (F)", 
+       y = "Proportion of days with Ozone ≥ 100")
+```
+
+
+
