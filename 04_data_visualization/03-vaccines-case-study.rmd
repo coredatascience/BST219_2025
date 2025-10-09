@@ -50,7 +50,12 @@ dat %>% ggplot(aes(year, state,  fill = rate)) +
         scale_x_continuous(expand = c(0,0)) +
         scale_fill_gradientn(colors = brewer.pal(9, "Reds"), trans = "sqrt") +
         geom_vline(xintercept = 1963, col = "blue") +
-        theme_minimal() +  theme(panel.grid = element_blank()) +
+        geom_text(x = 1985, 
+                  y = "West Virginia", 
+                  label = "Measles vaccine introduced",
+                  color = "blue") +
+        theme_minimal() +  
+        theme(panel.grid = element_blank()) +
         ggtitle(the_disease) + 
         ylab("") + 
         xlab("")

@@ -460,8 +460,97 @@ since they only became states in the late 1950s. Note there is a
 calculating the rate. There are 52 weeks in a year.</p>
 <pre class="r"><code>library(dslabs)
 library(dplyr)
-data(&quot;us_contagious_diseases&quot;)</code></pre>
+data(&quot;us_contagious_diseases&quot;)
+
+head(us_contagious_diseases)</code></pre>
+<pre><code>##       disease   state year weeks_reporting count population
+## 1 Hepatitis A Alabama 1966              50   321    3345787
+## 2 Hepatitis A Alabama 1967              49   291    3364130
+## 3 Hepatitis A Alabama 1968              52   314    3386068
+## 4 Hepatitis A Alabama 1969              49   380    3412450
+## 5 Hepatitis A Alabama 1970              51   413    3444165
+## 6 Hepatitis A Alabama 1971              51   378    3481798</code></pre>
+<pre class="r"><code>data &lt;- us_contagious_diseases %&gt;%
+  filter(disease == &quot;Measles&quot;,
+         !state %in% c(&quot;Alaska&quot;, &quot;Hawaii&quot;)) %&gt;%
+  mutate(rate = ((count/weeks_reporting)*52) / (population/100000))
+
+head(data)</code></pre>
+<pre><code>##   disease   state year weeks_reporting count population      rate
+## 1 Measles Alabama 1928              52  8843    2589923 341.43872
+## 2 Measles Alabama 1929              49  2959    2619131 119.89333
+## 3 Measles Alabama 1930              52  4156    2646248 157.05255
+## 4 Measles Alabama 1931              49  8934    2670818 354.98411
+## 5 Measles Alabama 1932              41   270    2693027  12.71577
+## 6 Measles Alabama 1933              51  1735    2713243  65.19945</code></pre>
+<pre class="r"><code>str(data)</code></pre>
+<pre><code>## &#39;data.frame&#39;:    3675 obs. of  7 variables:
+##  $ disease        : Factor w/ 7 levels &quot;Hepatitis A&quot;,..: 2 2 2 2 2 2 2 2 2 2 ...
+##  $ state          : Factor w/ 51 levels &quot;Alabama&quot;,&quot;Alaska&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ year           : num  1928 1929 1930 1931 1932 ...
+##  $ weeks_reporting: num  52 49 52 49 41 51 52 49 40 49 ...
+##  $ count          : num  8843 2959 4156 8934 270 ...
+##  $ population     : num  2589923 2619131 2646248 2670818 2693027 ...
+##  $ rate           : num  341.4 119.9 157.1 355 12.7 ...</code></pre>
+<pre class="r"><code>glimpse(data)</code></pre>
+<pre><code>## Rows: 3,675
+## Columns: 7
+## $ disease         &lt;fct&gt; Measles, Measles, Measles, Measles, Measles, Measles, …
+## $ state           &lt;fct&gt; Alabama, Alabama, Alabama, Alabama, Alabama, Alabama, …
+## $ year            &lt;dbl&gt; 1928, 1929, 1930, 1931, 1932, 1933, 1934, 1935, 1936, …
+## $ weeks_reporting &lt;dbl&gt; 52, 49, 52, 49, 41, 51, 52, 49, 40, 49, 52, 51, 48, 48…
+## $ count           &lt;dbl&gt; 8843, 2959, 4156, 8934, 270, 1735, 15849, 7214, 570, 6…
+## $ population      &lt;dbl&gt; 2589923, 2619131, 2646248, 2670818, 2693027, 2713243, …
+## $ rate            &lt;dbl&gt; 341.43872, 119.89333, 157.05255, 354.98411, 12.71577, …</code></pre>
+<pre class="r"><code># Another way to do it
+
+data &lt;- us_contagious_diseases %&gt;%
+  filter(disease == &quot;Measles&quot;,
+         state != &quot;Alaska&quot;,
+         state != &quot;Hawaii&quot;) %&gt;%
+  mutate(rate = ((count/weeks_reporting)*52) / (population/100000))
+
+head(data)</code></pre>
+<pre><code>##   disease   state year weeks_reporting count population      rate
+## 1 Measles Alabama 1928              52  8843    2589923 341.43872
+## 2 Measles Alabama 1929              49  2959    2619131 119.89333
+## 3 Measles Alabama 1930              52  4156    2646248 157.05255
+## 4 Measles Alabama 1931              49  8934    2670818 354.98411
+## 5 Measles Alabama 1932              41   270    2693027  12.71577
+## 6 Measles Alabama 1933              51  1735    2713243  65.19945</code></pre>
+<pre class="r"><code>str(data)</code></pre>
+<pre><code>## &#39;data.frame&#39;:    3675 obs. of  7 variables:
+##  $ disease        : Factor w/ 7 levels &quot;Hepatitis A&quot;,..: 2 2 2 2 2 2 2 2 2 2 ...
+##  $ state          : Factor w/ 51 levels &quot;Alabama&quot;,&quot;Alaska&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ year           : num  1928 1929 1930 1931 1932 ...
+##  $ weeks_reporting: num  52 49 52 49 41 51 52 49 40 49 ...
+##  $ count          : num  8843 2959 4156 8934 270 ...
+##  $ population     : num  2589923 2619131 2646248 2670818 2693027 ...
+##  $ rate           : num  341.4 119.9 157.1 355 12.7 ...</code></pre>
+<pre class="r"><code>glimpse(data)</code></pre>
+<pre><code>## Rows: 3,675
+## Columns: 7
+## $ disease         &lt;fct&gt; Measles, Measles, Measles, Measles, Measles, Measles, …
+## $ state           &lt;fct&gt; Alabama, Alabama, Alabama, Alabama, Alabama, Alabama, …
+## $ year            &lt;dbl&gt; 1928, 1929, 1930, 1931, 1932, 1933, 1934, 1935, 1936, …
+## $ weeks_reporting &lt;dbl&gt; 52, 49, 52, 49, 41, 51, 52, 49, 40, 49, 52, 51, 48, 48…
+## $ count           &lt;dbl&gt; 8843, 2959, 4156, 8934, 270, 1735, 15849, 7214, 570, 6…
+## $ population      &lt;dbl&gt; 2589923, 2619131, 2646248, 2670818, 2693027, 2713243, …
+## $ rate            &lt;dbl&gt; 341.43872, 119.89333, 157.05255, 354.98411, 12.71577, …</code></pre>
 <hr />
+</div>
+<div id="oct-9-2025" class="section level3">
+<h3>Oct 9, 2025</h3>
+<p>Using the <code>gapminder</code> dataset, create a line graph of
+<code>life_expectancy</code> over time for the country Haiti. Make sure
+to include informative axis labels and a title. There is a substantial
+decrease in life expectancy one year - look up the reason for this if
+you don’t know it already. Add text to your plot with
+<code>geom_text</code> indicating the event that happened that year that
+had such a drastic impact on life expectancy.</p>
+<pre class="r"><code>library(dslabs)
+library(dplyr)
+data(&quot;gapminder&quot;)</code></pre>
 </div>
 
 
