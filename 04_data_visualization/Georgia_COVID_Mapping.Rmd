@@ -1,0 +1,69 @@
+---
+title: "COVID-19 Case Mapping in Georgia"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(sf)
+library(tmap)
+library(viridis)
+```
+
+## Load and Prepare Data
+
+```{r}
+# Load Georgia county population and case data
+county_pop <- read_csv("county_pop.csv")
+
+# Download and read Georgia counties shapefile (from tigris or manually downloaded)
+# Example assumes shapefile is extracted to current folder
+ga_counties <- st_read("tl_2020_13_county20.shp")  # Georgia FIPS code = 13
+
+# Merge data with shapefile
+county_pop$FIPS <- str_pad(county_pop$`County FIPS code`, 3, pad = "0")
+county_pop$GEOID <- paste0(county_pop$`FIPS code`, county_pop$FIPS)
+ga_counties <- ga_counties %>%
+  left_join(county_pop, by = c("GEOID"))
+```
+
+## Map of Cumulative Case Rate
+
+```{r}
+tmap_mode("plot")
+tm_shape(ga_counties) +
+  tm_polygons("case rate",
+              title = "Cumulative cases per 100K",
+              palette = "Blues",
+              style = "jenks") +
+  tm_layout(title = "Georgia COVID-19 Cases per 100K (Cumulative)")
+```
+
+## Map of 14-Day Case Rate
+
+```{r}
+tm_shape(ga_counties) +
+  tm_polygons("14 day case rate",
+              title = "14-Day cases per 100K",
+              palette = "Reds",
+              style = "jenks") +
+  tm_layout(title = "Georgia COVID-19 Cases per 100K (Last 14 Days)")
+```
+
+## Side-by-Side Comparison
+
+```{r}
+tmap_mode("plot")
+t1 <- tm_shape(ga_counties) +
+  tm_polygons("case rate", title = "Cumulative", palette = "Blues", style = "jenks")
+
+t2 <- tm_shape(ga_counties) +
+  tm_polygons("14 day case rate", title = "14-Day", palette = "Reds", style = "jenks")
+
+t1 + t2
+```
+
+## Notes
+
+- Data is from Georgia counties with case rates and population estimates.
+- Visualized using `tmap` for comparison of cumulative and recent COVID-19 case rates.

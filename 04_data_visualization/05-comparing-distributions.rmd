@@ -1,0 +1,614 @@
+---
+title: "Comparing Distributions"
+output: 
+  html_document:
+    toc: true
+---
+
+## TLDR
+
+In this lecture, we explore how to visualize and compare distributions across groups using boxplots, density plots, and conditional logic to enhance your plots. You’ll learn how to:
+
+* Stratify and Boxplot
+  * Use `geom_boxplot()` to compare the distribution of a continuous variable across categories.
+  * Combine with `aes(group = ...)` or `aes(color = ...)` to stratify by another variable for side-by-side comparisons.
+
+* Comparing Distributions
+  * Understand how visual summaries like boxplots and histograms help reveal group differences, skewness, and outliers.
+
+* Smooth Density Plots
+  * Use `geom_density()` to display smoothed versions of distributions—ideal for continuous data.
+  * Overlay densities by group (e.g., `fill = group`, `alpha = 0.4`) to visualize how distributions overlap or differ.
+
+* Conditional Logic with `case_when()`
+  * Use the `case_when()` function to create new categorical variables or simplify groups before plotting.
+
+## Stratify and boxplot
+
+The histogram showed us that the income distribution values show a dichotomy. However, the histogram does not show us if the two groups of countries are _west_ versus the _developing_ world.  
+
+To see distributions by geographical region we first stratify the data into regions, and then examine the distribution for each. Because of the number of regions,
+
+```{r, message=FALSE}
+library(tidyverse)
+library(dslabs)
+data(gapminder)
+
+levels(gapminder$region)
+length(levels(gapminder$region))
+```
+
+looking at histograms or smooth densities for each will not be useful. Instead, we can stack boxplots next to each other:
+
+```{r}
+gapminder <- gapminder %>% 
+  mutate(dollars_per_day = gdp/population/365)
+
+past_year <- 1970
+```
+
+```{r}
+p <- gapminder %>% 
+  filter(year == past_year & !is.na(gdp)) %>%
+  ggplot(aes(region, dollars_per_day))  +
+  xlab("Region") +
+  ylab("Dollars per day")
+p + geom_boxplot() 
+```
+
+Note that we can't read the region names because the default gpplot behavior is to write the labels horizontally and, here, we run of of room. We can easily fix this by rotating the labels. Consulting the cheat sheet we find we can rotate the names by changing the `theme` through `element_text`. The `hjust=1` justifies the text so that it is next to the axis.
+
+```{r}
+p + geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))  +
+  xlab("") +
+  ylab("Dollars per day")
+```
+
+We can already see that there is indeed a west versus the rest dichotomy. 
+
+
+### Do not order alphabetically
+
+There are a few more adjustments we can make to this plot help uncover this reality. First, it helps to order the regions in the boxplots from poor to rich rather than alphabetically. This can be achieved using the `reorder` function. This function let's us change the order of the levels of a factor variable based on a summary computed on a numeric vector. A character vector gets coerced into a factor. Here is an example. Note how the order of levels changes:
+
+```{r}
+fac <- factor(c("Asia", "Asia", "West", "West", "West"))
+levels(fac)
+
+value <- c(10, 11, 12, 6, 4)
+fac <- reorder(fac, value, FUN = mean)
+levels(fac)
+```
+
+Second, we can use color to distinguish the different continents, a visual cue that helps find specific regions. Here is the code:
+
+```{r}
+p <- gapminder %>% 
+  filter(year == past_year & !is.na(gdp)) %>%
+  mutate(region = reorder(region, dollars_per_day, FUN = median)) %>%
+  ggplot(aes(region, dollars_per_day, fill = continent)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  xlab("") +
+  ylab("Dollars per day") +
+  labs(fill = "Continent")
+p
+```
+
+This plot shows two clear groups, with the rich group composed of North America, Northern and Western Europe, New Zealand and Australia. As with the histogram, if we remake the plot using a log scale
+
+```{r}
+p + scale_y_continuous(trans = "log2")
+```
+
+we are able to better see differences within the devoloping world.
+
+### Show the data
+
+In many cases we do not show the data because it adds clutter to the plot and obfuscates the message. In the example above this is not the case and adding points actually lets us see all the data. We can add this layer using `geom_point()`.
+
+
+```{r}
+p + scale_y_continuous(trans = "log2") + 
+  geom_point() +
+  xlab("") +
+  ylab("Dollars per day") +
+  labs(fill = "Continent")
+```
+
+## Comparing Distributions
+
+The exploratory data analysis above has revealed two characteristics about average income distribution in 1970. Using a histogram we found a bimodal distribution with the modes relating to poor and rich countries. Then by stratifying by region and examining boxplots we found that the rich countries were mostly in Europe and Northern America, along with Australia and New Zealand. We define a vector with these regions:
+
+```{r}
+west <- c("Western Europe","Northern Europe","Southern Europe",
+          "Northern America","Australia and New Zealand")
+```
+Now we want to focus on comparing the differences in distributions across time.
+
+We start by confirming that the bimodality observed in 1970 is explained by a west versus devoloping world dichotomy. We do this by creating histograms for the groups previously identified. Note that we create the two groups with an `ifelse` inside a `mutate` and that we use `facet_grid` to make a histogram for each group:
+```{r}
+gapminder %>% 
+  filter(year == past_year & !is.na(gdp)) %>%
+  mutate(group = ifelse(region %in% west, "West", "Developing")) %>%
+  ggplot(aes(dollars_per_day)) +
+  geom_histogram(binwidth = 1, color = "black") +
+  scale_x_continuous(trans = "log2") + 
+  facet_grid(. ~ group)  +
+  ylab("Number of countries") +
+  xlab("Dollars per day")
+```
+
+Now we are ready to see if the separation is worse today than it was 40 years ago. We do this by faceting by both region and year:
+
+```{r}
+past_year <- 1970
+present_year <- 2010
+gapminder %>% 
+  filter(year %in% c(past_year, present_year) & !is.na(gdp)) %>%
+  mutate(group = ifelse(region %in% west, "West", "Developing")) %>%
+  ggplot(aes(dollars_per_day)) +
+  geom_histogram(binwidth = 1, color = "black") +
+  scale_x_continuous(trans = "log2") + 
+  facet_grid(year ~ group)  +
+  xlab("Number of countries") +
+  ylab("Dollars per day")
+```
+
+Before we interpret the findings of this plot, we note that there are more countries represented in the 2010 histograms than in 1970: the total counts are larger. One reason for this is that several countries were founded after 1970. For example, the Soviet Union turned into several countries including Russia and Ukraine during the 1990s. Another reason is that data was available for more countries during 2010.  
+
+We remake the plots using only countries with data available for both years. In the data wrangling chapter we will learn `tidyverse` tools that permit us to  write efficient code for this, but here is simple code using the `intersect` function:
+
+```{r}
+country_list_1 <- gapminder %>% 
+  filter(year == past_year & !is.na(dollars_per_day)) %>% .$country
+
+country_list_2 <- gapminder %>% 
+  filter(year == present_year & !is.na(dollars_per_day)) %>% .$country
+      
+country_list <- intersect(country_list_1, country_list_2)
+```
+
+These `r length(country_list)` account for  `r round(gapminder %>% filter(year==present_year) %>%
+  summarize(perc=sum(population[country%in%country_list], na.rm=TRUE)/sum(population, na.rm=TRUE)) %>% .$perc*100 )` 
+% of the world population, so this subset should be representative.
+
+Let's remake the plot but only for this subset by simply adding ` country %in% country_list` to the filter function:
+```{r, echo=FALSE}
+gapminder %>% 
+  filter(year %in% c(past_year, present_year) & country %in% country_list) %>%
+  mutate(group = ifelse(region %in% west, "West", "Developing")) %>%
+  ggplot(aes(dollars_per_day)) +
+  geom_histogram(binwidth = 1, color = "black") +
+  scale_x_continuous(trans = "log2") + 
+  facet_grid(year ~ group)  +
+  xlab("Number of countries") +
+  ylab("Dollars per day")
+```
+
+We now see that while the rich countries have become a bit richer, percentage-wise, the poor countries appear to have improved more. In particular we see that the proportion of _developing_ countries earning more than $16 a day increases substantially. 
+
+To see which specific regions improved the most we can remake the boxplots we made above but now  adding 2010
+
+```{r}
+p <- gapminder %>% 
+  filter(year %in% c(past_year, present_year) & country %in% country_list) %>%
+  mutate(region = reorder(region, dollars_per_day, FUN = median)) %>%
+  ggplot() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  xlab("") +
+  ylab("Dollars per day") +
+  scale_y_continuous(trans = "log2") +
+  labs(fill = "Continent")
+```
+
+and then using facet to compare the two years:
+
+```{r}
+p + geom_boxplot(aes(region, dollars_per_day, fill = continent)) +
+  facet_grid(year~.)
+```
+
+Here, we pause to introduce another powerful ggplot2 feature. Because we want to compare each region before and after, it would be convenient to have the `r past_year` boxplot next to the `r present_year` boxplot for each region. In general, comparisons are easier when data are plotted next to each other.
+
+So, instead of faceting, we keep the data from each year together, but ask ggplot to color (or fill) them depending on the year. ggplot automatically separates them and puts the two boxplots next to each other. Because year is a number, we turn it into a factor because ggplot automatically assigns a color to each category of a factor:  
+
+```{r}
+p + geom_boxplot(aes(region, dollars_per_day, fill = factor(year))) +
+    labs(fill = "Year")
+```
+
+Finally, we point out that if what we are most interested is in comparing before and after values, it might make more sense to plot the ratios, or difference in the log scale. We are still not ready to learn to code this but here is what the plot would look like:
+
+```{r, echo=FALSE}
+gapminder %>% 
+  filter(year %in% c(past_year, present_year) & country %in% country_list) %>%
+  mutate(year = ifelse(year == past_year, "past", "present")) %>%
+  dplyr::select(country, region, continent, year, dollars_per_day) %>%
+  head()
+```
+
+```{r, echo=FALSE}
+gapminder %>% 
+  filter(year %in% c(past_year, present_year) & country %in% country_list) %>%
+  mutate(year = ifelse(year == past_year, "past", "present")) %>%
+  dplyr::select(country, region, continent, year, dollars_per_day) %>%
+  spread(year, dollars_per_day) %>%
+  head()
+```
+
+
+```{r, echo=FALSE}
+gapminder %>% 
+  filter(year %in% c(past_year, present_year) & country %in% country_list) %>%
+  mutate(year = ifelse(year == past_year, "past", "present")) %>%
+  dplyr::select(country, region, continent, year, dollars_per_day) %>%
+  spread(year, dollars_per_day)  %>%
+  mutate(difference = present/past) %>%
+  mutate(region = reorder(region, difference, FUN = median)) %>%
+  ggplot(aes(region,  difference, fill = factor(continent))) +
+  geom_boxplot() + 
+  geom_point(show.legend = FALSE) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  xlab("") + ylab("Fold Increase Between 1970 and 2010") +
+  labs(fill = "Continent") +
+  scale_y_continuous(trans = "log2")  
+```
+
+
+To make the y-axis label general we could use the `paste` function:
+
+```{r}
+ylab(paste("Fold Increase Between", past_year, "and", present_year))
+```
+  
+## Smooth Density Plots
+
+We have used data exploration to discover that income gap between rich and poor countries has closed considerably during the last 40 years. We used a series of histograms and boxplots to see this. Here we suggest a succinct way to convey this message with just one plot. We will use smooth density plots.
+
+Let's start by noting that  density plots for income distribution in `r past_year` and `r present_year` deliver the message that the gap is closing:
+
+```{r}
+gapminder %>% 
+  filter(year %in% c(past_year, present_year) & country %in% country_list) %>%
+  ggplot(aes(dollars_per_day)) +
+  geom_density(fill = "grey") + 
+  scale_x_continuous(trans = "log2") + 
+  xlab("Dollars per day") +
+  facet_grid(year~.)
+```
+
+In the `r past_year` plot we see two clear modes, poor and rich countries. In `r present_year` it appears that some of the poor countries have shifted towards the right, closing the gap. 
+
+The next message we need to covey is that the reason for this change in distribution is that poor countries became richer rather than some rich countries becoming poorer. To do this all we need to do is assign a color to the groups we identified during data exploration. 
+
+However, before we can do this we need to  learn how to make these smooth densities in a way that preserves information of how many countries are in each group. To understand why we need this, note the discrepancy in the size of each group:
+
+```{r, echo=FALSE, message=FALSE}
+gapminder %>% 
+  filter(year == past_year & country %in% country_list) %>%
+  mutate(group = ifelse(region %in% west, "West", "Developing")) %>% group_by(group) %>% 
+  summarize(n=n()) %>% knitr::kable()
+```
+
+but when we overlay two densities, the default is to have the area represented by each distribution add up to 1 regardless of the size of each group:
+
+```{r}
+gapminder %>% 
+  filter(year %in% c(past_year, present_year) & country %in% country_list) %>%
+  mutate(group = ifelse(region %in% west, "West", "Developing")) %>%
+  ggplot(aes(dollars_per_day, fill = group)) +
+  scale_x_continuous(trans = "log2") +
+  geom_density(alpha = 0.2) + 
+  facet_grid(year ~ .) +
+  xlab("Dollars per day") +
+  labs(fill = "Group")
+```
+
+which make it appear as if there are the same number of countries in each group. To change this, we will need to learn to access computed variables with the `geom_density` function.
+
+## Accessing Computed Variables
+
+To have the areas of these densities be proportional to the size of the groups, we can simply multiply the y-axis values by the size of the group. From the `geom_density` help file we see that the function computes a variable called `count` that does exactly this. We want this variable to be on the y-axis rather than the density.
+
+In ggplot we access these variables by using `after_stat(count)`. So we will use the following mapping:
+
+```{r, eval=FALSE}
+aes(x = dollars_per_day, y = after_stat(count))
+```
+
+We can now create the desired plot by simply changing the mapping in the previous code chunk:
+
+
+```{r}
+p <- gapminder %>% 
+  filter(year %in% c(past_year, present_year) & country %in% country_list) %>%
+  mutate(group = ifelse(region %in% west, "West", "Developing")) %>%
+  ggplot(aes(dollars_per_day, y = after_stat(count), fill = group)) +
+  scale_x_continuous(trans = "log2") +
+  xlab("Dollars per day") +
+  labs(fill = "Group")
+
+p + geom_density(alpha = 0.2) + facet_grid(year ~ .)
+```
+
+If we want the densities to be smoother, we use the `bw` argument. We tried a few and decided on 0.75:
+
+```{r}
+p + geom_density(alpha = 0.2, bw = 0.75) + facet_grid(year ~ .)
+```
+
+This plot now shows what is happening very clearly. The developing world distribution is changing. A third mode appears consisting of the countries that most closed the gap. 
+
+## 'case_when'
+
+We can actually make this figure somewhat more informative. From the exploratory data analysis we noticed that many of the countries that most improved were from Asia. We can easily alter the plot to show key regions separately. 
+
+We  introduce the `case_when` function useful for defining groups:
+
+```{r}
+gapminder <- gapminder %>% 
+  mutate(group = case_when(
+    region %in% west ~ "West",
+    region %in% c("Eastern Asia", "South-Eastern Asia") ~ "East Asia",
+    region %in% c("Caribbean", "Central America", "South America") ~ "Latin America",
+    continent == "Africa" & region != "Northern Africa" ~ "Sub-Saharan Africa",
+    TRUE ~ "Others"))
+```
+
+We turn this `group` variable into a factor to control the order of the levels:
+
+```{r}
+gapminder <- gapminder %>% 
+  mutate(group = factor(group, levels = c("Others", "Latin America", "East Asia","Sub-Saharan Africa", "West")))
+```
+
+We pick this particular order for a reason that becomes clear later.
+
+We can now easily plot the densities for each. We use `color` and `size` to clearly see the tops:
+```{r}
+p <- gapminder %>% 
+    filter(year %in% c(past_year, present_year) & country %in% country_list) %>%
+  ggplot(aes(dollars_per_day, y = after_stat(count), fill = group, color = group)) +
+  scale_x_continuous(trans = "log2")
+
+p + geom_density(alpha = 0.2, bw = 0.75, linewidth = 2) + facet_grid(year ~ .)
+```
+
+The plot is cluttered and somewhat hard to read. A clearer picture is sometimes achieved by stacking the densities on top of each other:
+
+```{r}
+p + geom_density(alpha = 0.2, bw = 0.75, position = "stack") + facet_grid(year ~ .)
+```
+
+Here we can clearly see how the distributions for East Asia, Latin America and Others shift markedly to the right. While Sub-Saharan Africa remains stagnant. 
+
+Note that we order the levels of the group so that The West density be plotted first, then Sub-Saharan Africa. *Having the two extremes be plotted first let's us see the remaining bimodality better*.
+
+
+## Weighted densities
+
+As a final point, we note that these distributions weigh every country the same. So if most of the population is improving, but living in a very large country, such as China, we might not appreciate this. We can actually weight the smooth densities using the `weight` mapping argument. Here we weight by population:
+
+```{r, warning=FALSE}
+gapminder %>% 
+    filter(year %in% c(past_year, present_year) & country %in% country_list) %>%
+  group_by(year) %>%
+  mutate(weight = population/sum(population)) %>%
+  ungroup() %>%
+  ggplot(aes(dollars_per_day, fill = group, weight = weight)) +
+  scale_x_continuous(trans = "log2") + 
+  geom_density(alpha = 0.2, bw = 0.75, position = "stack") + facet_grid(year ~ .) 
+```
+
+This particular figure shows very clearly how the income distribution gap is closing with most of the poor remaining in Sub-Saharan Africa.
+
+## Self-Assessment Questions
+
+We will be exploring the [`birthwt` data set from the `MASS` package](https://www.rdocumentation.org/packages/MASS/versions/7.3-65/topics/birthwt) in these self-assessment questions. 
+
+The birthwt dataset from the `MASS` package contains information about 189 newborn babies from Baystate Medical Center in Springfield, Massachusetts, collected in 1986. The dataset includes a `bwt` variable for birth weight in grams and other predictor variables like mother's age, weight, smoking status, and the number of premature labors. This dataset is commonly used for statistical analysis, particularly in modeling low birth weight. 
+
+* `low`: Binary indicator of birth weight less than 2.5 kg 
+* `age`: Mother's age in years 
+* `lwt`: Mother's weight in pounds at the last menstrual period 
+* `race`: Mother's race (1 = white, 2 = black, 3 = other) 
+* `smoke`: Smoking status during pregnancy 
+* `ptl`: Number of previous premature labors 
+* `ht`: History of hypertension 
+* `ui`: Presence of uterine irritability 
+* `ftv`: Number of physician visits during the first trimester 
+* `bwt`: Birth weight in grams 
+
+```{r, message=FALSE}
+library(MASS)
+library(tidyverse)
+
+data(birthwt)
+```
+
+1. Relabel `smoke` to be `Non-smoker` or `Smoker`. Relabel `ht` to be `No` and `Yes`. Add a column to the `bwt` dataset called `bwt_abb` (see below on how to create it) and save the new data frame as `birthwt2`. Follow the cutoffs shown here to create the following categories for the `bwt_abb` column:
+
+* `NLBW`: not low birth weight; babies born with `bwt` > 2500 grams.
+* `LBW`: low birth weight; babies born with `bwt` < 2500 grams and >= 1500 grams. 
+* `VLBW`: very low birth weight; babies born with `bwt` < 1500 grams and >= 1000 grams.
+* `ELBW`: extremely low birth weight; babies born with `bwt` < 1000 grams.
+
+```{r}
+# Your code here
+```
+
+2. Compare `bwt` across `ht` and `smoking` with side-by-side boxplots. Is there a difference in median birth weight between those with and without a history of hypertension, and smokers and non-smokers? Hint: there should be 4 boxplots total: one for non-smokers with a history of hypertension, one for smokers with a history of hypertension, one for non-smokers without a history of hypertension, and one for smokers without a history of hypertension.
+
+```{r}
+# Your code here
+```
+
+
+3. Now compare mother's age across the birth weight categories you created in question 1. Create a boxplot for each category all in the same plot, and order by median age. Is there anything interesting you notice about this plot?
+
+
+```{r}
+# Your code here
+```
+
+
+4. Create a plot of 2 histograms of `bwt` by `smoking` status with fixed `binwidth = 100` and a dashed vertical line at each group’s median value. Hint: you will need to use the `summarize` function to calculate the medians before you plot anything. 
+
+```{r}
+# Your code here
+```
+
+5. Using the `heights` dataset from the `dslabs` package, create overlapping density curves of `height` by `sex` with transparency.
+
+```{r, message=FALSE}
+# Your code here
+```
+
+
+6. Redraw the densities in question 5 so the y-axis reflects counts (area proportional to group size). What becomes obvious from this plot?
+
+```{r}
+# Your code here
+```
+
+
+7. Show how density shape changes with `bw`. Make two density plots of height: one with `bw = 0.5` and one with `bw = 2`.
+
+```{r}
+# Your code here
+```
+
+```{r}
+# Your code here
+```
+
+
+
+
+## Self-Assessment Solutions
+
+1. Relabel `smoke` to be `Non-smoker` or `Smoker`. Relabel `ht` to be `No` and `Yes`. Add a column to the `bwt` dataset called `bwt_abb` (see below on how to create it) and save the new data frame as `birthwt2`. Follow the cutoffs shown here to create the following categories for the `bwt_abb` column:
+
+* `NLBW`: not low birth weight; babies born with `bwt` > 2500 grams.
+* `LBW`: low birth weight; babies born with `bwt` < 2500 grams and >= 1500 grams. 
+* `VLBW`: very low birth weight; babies born with `bwt` < 1500 grams and >= 1000 grams.
+* `ELBW`: extremely low birth weight; babies born with `bwt` < 1000 grams.
+
+```{r}
+birthwt2 <- birthwt %>%
+  mutate(
+    smoke = factor(smoke, labels = c("Non-smoker", "Smoker")),
+    ht  = factor(ht,  labels = c("No", "Yes")),
+    bwt_abb = case_when(
+      bwt >= 2500 ~ "NLBW",
+      (bwt < 2500) & (bwt >= 1500) ~"LBW",
+      bwt < 1000 ~ "ELBW",
+      TRUE ~ "VLBW"
+    )
+  )
+```
+
+2. Compare `bwt` across `ht` and `smoking` with side-by-side boxplots. Is there a difference in median birth weight between those with and without a history of hypertension, and smokers and non-smokers? Hint: there should be 4 boxplots total: one for non-smokers with a history of hypertension, one for smokers with a history of hypertension, one for non-smokers without a history of hypertension, and one for smokers without a history of hypertension.
+
+```{r}
+birthwt2 %>%
+  ggplot(aes(x = ht, y = bwt, fill = smoke)) +
+  geom_boxplot() +
+  labs(x = "History of hypertension", 
+       y = "Birth weight (grams)", 
+       fill = "Smoking status")
+```
+
+The median birth weight for smokers is lower than the median birth weight of non-smokers for mothers who do not have a history of hypertension. The median birth weight looks to be the same for smokers and non-smokers among mothers with a history of hypertension. 
+
+3. Now compare mother's age across the birth weight categories you created in question 1. Create a boxplot for each category all in the same plot, and order by median age. Is there anything interesting you notice about this plot?
+
+
+```{r}
+birthwt2 %>%
+  mutate(bwt_abb = reorder(bwt_abb, age, FUN = median)) %>%
+  ggplot(aes(x = bwt_abb, y = age)) +
+  geom_boxplot() +
+  labs(x = "Birth weight category", 
+       y = "Mother's age (years)")
+```
+
+We can see that the median age for each category is different with LBW having the smallest median age, NLBW being the next smallest, VLBW the next smallest, and ELBW the largest median age. It's also interesting that there is only a median bar and not a box for the ELBW category. Looking at a table of how many babies are in each category, we can see that there is only a line for the ELBW group because there is only 1 baby in that group. 
+
+```{r}
+table(birthwt2$bwt_abb)
+```
+
+
+4. Create a plot of 2 histograms of `bwt` by `smoking` status with fixed `binwidth = 100` and a dashed vertical line at each group’s median value. Hint: you will need to use the `summarize` function to calculate the medians before you plot anything. 
+
+```{r}
+meds <- birthwt2 %>%
+  group_by(smoke) %>%
+  summarize(median_bwt = median(bwt, na.rm = TRUE), .groups = "drop")
+
+birthwt2 %>%
+  ggplot(aes(x = bwt)) +
+  geom_histogram(binwidth = 100, 
+                 color = "black",
+                 fill = "lightblue") +
+  geom_vline(data = meds, 
+             aes(xintercept = median_bwt),
+             linetype = "dashed",
+             color = "blue") +
+  facet_grid(. ~ smoke) +
+  labs(x = "Birth weight (grams)", y = "Count")
+```
+
+5. Using the `heights` dataset from the `dslabs` package, create overlapping density curves of `height` by `sex` with transparency.
+
+```{r, message=FALSE}
+data(heights)
+
+heights %>%
+  ggplot(aes(x = height, fill = sex)) +
+  geom_density(alpha = 0.35) +
+  labs(x = "Height (inches)", 
+       y = "Density", 
+       fill = "Sex")
+```
+
+
+6. Redraw the densities in question 5 so the y-axis reflects counts (area proportional to group size). What becomes obvious from this plot?
+
+```{r}
+heights %>%
+  ggplot(aes(x = height, y = after_stat(count), fill = sex)) +
+  geom_density(alpha = 0.35) +
+  labs(x = "Height (inches)", 
+       y = "Count (via after_stat)", 
+       fill = "Sex")
+```
+
+Using counts on the y-axis we can see that there are many more males than females in this dataset.
+
+7. Show how density shape changes with `bw`. Make two density plots of height: one with `bw = 0.5` and one with `bw = 2`.
+
+```{r}
+ggplot(heights, aes(height)) +
+  geom_density(fill = "grey80", bw = 0.5) +
+  labs(title = "Kernel density with bw = 0.5",
+       x = "Height (inches)", 
+       y = "Density")
+```
+
+```{r}
+ggplot(heights, aes(height)) +
+  geom_density(fill = "grey80", bw = 2) +
+  labs(title = "Kernel density with bw = 2",
+       x = "Height (inches)", 
+       y = "Density")
+```
+
+
+
+
+
+
