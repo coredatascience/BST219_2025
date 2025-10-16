@@ -195,3 +195,23 @@ merged_data[!complete.cases(merged_data),]
 ```
 
 All of the NAs are in the District of Columbia row. All of the values from the state.x77 dataset are missing. This means that the state.x77 dataset did not contain a row for District of Columbia, which resulted in NA values when  joined to the murders dataset.
+
+### Oct 16, 2025
+
+```{r}
+library(dslabs)
+library(dplyr)
+library(ggplot2)
+data("murders")
+
+murders %>% 
+  mutate(rate = total / population * 100000,
+         region = reorder(region, rate, FUN = median)) %>%
+  ggplot(aes(region, rate, fill = region)) +
+  geom_boxplot() +
+  xlab("Region") +
+  ylab("Murder rate per 100,000 persons") +
+  ggtitle("2010 Gun Murder Rates Across US Regions") +
+  guides(fill = "none") # removes legend since not needed here
+```
+
