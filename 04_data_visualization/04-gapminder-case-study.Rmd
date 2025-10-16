@@ -508,7 +508,7 @@ Lines usually communicate trends better for dense, ordered time series.
 7. Using the `economics_long` dataset from the `ggplot2` package, plot two time series line graphs - one for `unemploy` and one for `psavert` - over time. Use `facet_wrap` to plot them on separate y axes. Be sure to filter to just those two variables first. Note: you'll need to add the following arguments to `facet_wrap`: `, scales = "free_y", ncol = 1`. This will ensure each plot has an appropriate scale and that the plots are stacked vertically.  
 
 ```{r}
-# Your code here
+
 ```
 
 8. Using the `airquality` dataset, compute, by `Month`, the proportion of "high-ozone days" (`Ozone` >= 100). Plot mean `Temp` (x) vs proportion high-ozone (y).
@@ -643,7 +643,23 @@ econ2 <- economics_long %>%
 econ2 %>% 
   ggplot(aes(date, value, color = variable)) +
   geom_line() +
-  facet_wrap(~ variable) +
+  facet_grid(variable ~ ., scales = "free_y") +
+  labs(title = "Two series over time (faceted)", 
+       x = "Date", 
+       y = "Value", 
+       color = "Series")
+```
+
+```{r}
+data(economics_long, package = "ggplot2")
+
+econ2 <- economics_long %>% 
+  filter(variable %in% c("unemploy", "psavert"))
+
+econ2 %>% 
+  ggplot(aes(date, value, color = variable)) +
+  geom_line() +
+  facet_wrap(~ variable, scales = "free_y", ncol = 1) +
   labs(title = "Two series over time (faceted)", 
        x = "Date", 
        y = "Value", 
