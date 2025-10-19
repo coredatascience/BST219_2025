@@ -150,6 +150,8 @@ gapminder %>% filter(country == "Haiti") %>%
   ggtitle("Life expectancy in Haiti")
 ```
 
+---
+
 ### Oct 14, 2025
 
 Using the `murders` dataset from the `dslabs` package and the `state.x77` dataset that is built in to R, make a scatterplot with the total number of gun murders (`total`) on the y-axis and land area in square miles (`Area`) on the x-axis. You will need to use the `left_join` function to join the `state.x77` dataset to the `murders` dataset using the `state` column. 
@@ -196,6 +198,8 @@ merged_data[!complete.cases(merged_data),]
 
 All of the NAs are in the District of Columbia row. All of the values from the state.x77 dataset are missing. This means that the state.x77 dataset did not contain a row for District of Columbia, which resulted in NA values when  joined to the murders dataset.
 
+---
+
 ### Oct 16, 2025
 
 ```{r}
@@ -214,4 +218,57 @@ murders %>%
   ggtitle("2010 Gun Murder Rates Across US Regions") +
   guides(fill = "none") # removes legend since not needed here
 ```
+
+---
+
+### Oct 21, 2025
+
+Using the gapminder dataset, make a line graph of life expectancy over time. Include one line per country, and another line with the global average life expectancy. Be sure to label the global average line and to make it stick out among the country-specific lines. Use the code below to calculate the crude global average for each year.
+
+Hints:
+
+1. Use alpha to help make the global average line stick out.
+2. Use 2 geom_line layers.
+3. Note that avg is a data frame.
+
+
+```{r}
+library(dslabs)
+library(dplyr)
+library(ggplot2)
+data("gapminder")
+
+avg <- gapminder %>%
+  group_by(year) %>%
+  summarize(global_avg = mean(life_expectancy))
+```
+
+---
+
+### Oct 23, 2025
+
+Using the `gapminder` dataset, create a categorical life expectancy variable and add it to the `gapminder` dataset. Call this variable `life_expectancy_category` and use the `case_when` function to create it. Life expectancy below 50 should be labeled "Low", life expectancy greater than or equal to 50 and less than 75 should be labeled "Medium", and life expectancy greater than or equal to 75 should be labeled "High".
+
+Now, filter the dataset to only include observations from the year 1999, and create a bar chart of the 3 life expectancy categories. Reorder the bars so that they are in the order Low, Medium, High.
+
+
+```{r}
+library(dplyr)
+library(dslabs)
+library(ggplot2)
+
+data("gapminder")
+```
+
+
+
+
+
+
+
+
+
+
+
+
 
