@@ -223,7 +223,7 @@ murders %>%
 
 ### Oct 21, 2025
 
-Using the gapminder dataset, make a line graph of life expectancy over time. Include one line per country, and another line with the global average life expectancy. Be sure to label the global average line and to make it stick out among the country-specific lines. Use the code below to calculate the crude global average for each year.
+Using the `gapminder` dataset, make a line graph of life expectancy over time. Include one line per country, and another line with the global average life expectancy. Be sure to label the global average line and to make it stick out among the country-specific lines. Use the code below to calculate the crude global average for each year.
 
 Hints:
 
@@ -240,8 +240,36 @@ data("gapminder")
 
 avg <- gapminder %>%
   group_by(year) %>%
-  summarize(global_avg = mean(life_expectancy))
+  dplyr::summarize(global_avg = mean(life_expectancy, na.rm=TRUE)) 
+print(avg)
 ```
+
+
+```{r}
+gapminder %>% 
+  ggplot() +
+  geom_line(aes(x = year, y = life_expectancy, group = country),
+            color = 'darkgrey', 
+            alpha = 0.4) +
+  geom_line(data = avg, 
+            mapping = aes(x = year, y = global_avg), 
+            linewidth = 1) +
+  xlab("Year") +
+  ylab("Life expectancy (Years)") +
+  ggtitle("Life expectancy across countries") +
+  #annotate(geom = "text", x = 1970, y = 54, 
+           #label = "Global average", fontface = "bold")
+  geom_text(x = 1980, y = 55, label = "Global Average")
+
+```
+```{r}
+gapminder_94 <- gapminder %>% filter(year == "1994")
+gapminder_94[which.min(gapminder_94$life_expectancy),] # Rwandan genocide
+
+gapminder_77 <- gapminder %>% filter(year == "1977")
+gapminder_77[which.min(gapminder_77$life_expectancy),] # Cambodian genocide
+```
+
 
 ---
 
