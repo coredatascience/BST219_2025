@@ -288,7 +288,29 @@ library(ggplot2)
 data("gapminder")
 ```
 
+```{r}
+gapminder <- gapminder %>%
+  filter(year == 1999) %>%
+  mutate(life_expectancy_category = 
+           case_when(
+             life_expectancy < 50 ~ "Low",
+             life_expectancy >= 75 ~ "High",
+             TRUE ~ "Medium"
+           )) %>%
+  mutate(life_expectancy_category = 
+           factor(life_expectancy_category, 
+           levels = c("Low", "Medium", "High")
+          )
+         )
+```
 
+```{r}
+gapminder %>% 
+  ggplot(aes(life_expectancy_category)) +
+  geom_bar(color = "black", fill = "steelblue") +
+  labs(x = "Life expectancy category",
+       y = "Number of countries")
+```
 
 
 
