@@ -1,0 +1,352 @@
+---
+title: "Summarizing Data"
+output: 
+  html_document:
+    toc: true
+---
+
+## TL;DR
+
+In addition to visualization, summarizing data can aid in gaining insights about your dataset. In this section, we’ll review the most common summary statistics and how to compute them in R. We'll start with overall summaries and discuss why certain summaries (e.g., mean vs. median) are preferable under skewed distributions and how to handle missing values. In this document we explore how to present summary statistics about data in a publishable table, like a "Table 1" in a scientific journal article. Things to keep in mind:
+
+* Always check missingness before making a table or plot; decide whether to impute, drop, or flag.
+* Use medians/IQRs for skewed data; means/SDs for roughly symmetric distributions.
+* The `summarize()` function must return one value per group/column; functions like `range()` return two values, so use `min()` and `max()` or switch to the `reframe()` function.
+* For frequency tables, use `prop.table(tab, 1)` for row proportions and `prop.table(tab, 2)` for column proportions.
+* Label and scale variables for readability (e.g., millions/billions).
+* Set `options(digits = 2)` to display tidy tables without altering underlying precision.
+
+
+## Summary Statistics
+
+We'll use the `gapminder` dataset once again and will start with the `summary` function. This base R summary gives min/median/mean/quartiles for numeric variables and counts for factors/characters. It's a good first look before deeper work.
+
+```{r, message=FALSE, warning=FALSE}
+library(dslabs)
+library(tidyverse)
+data(gapminder)
+summary(gapminder)
+```
+
+We can also use the function with the pipe. For example, after using the `filter` function.
+
+```{r}
+gapminder %>%
+  filter(year == 1986) %>%
+  select(life_expectancy) %>%
+  summary()
+```
+
+Let's store just the 1986 life expectancy values (after removing NAs) so we can compute specific statistics one by one. Remember:
+
+* Mean is sensitive to outliers
+* Median is robust to skew/outliers
+* Standard deviation (sd)/variance quantify spread around the mean
+* Range (min, max) and IQR (Q3–Q1) capture overall and middle-50% spread, respectively.
+
+```{r}
+gapminder_1986 <- gapminder %>%
+  filter(year == 1986 & !is.na(life_expectancy))
+
+le_1986 <- gapminder_1986$life_expectancy
+
+mean(le_1986)
+median(le_1986)
+sd(le_1986)
+var(le_1986)
+range(le_1986)
+IQR(le_1986)
+```
+### Grouped summaries
+
+It’s common in public health to compare summaries across regions or demographic groups. Below we compute statistics by continent for 1986. Two notes:
+
+1. In `summarize()`, each expression must return one value per group. Because `range()` returns two values (min and max), it will cause an error if used directly in `summarize()`. Use `min()` and `max()` instead.
+
+2. If you do want to return multiple rows per group from a single expression, `reframe()` is the right tool (shown next).
+	
+```{r}
+gapminder %>% 
+  filter(year == 1986 & !is.na(life_expectancy)) %>%
+  group_by(continent) %>%
+  summarize(le_mean = mean(life_expectancy),
+            le_median = median(life_expectancy),
+            le_sd = sd(life_expectancy),
+            le_var = var(life_expectancy),
+            le_min = min(life_expectancy),
+            le_max = max(life_expectancy),
+            le_IQR = IQR(life_expectancy)) %>%
+  ungroup()
+
+gapminder %>% 
+  filter(year == 1986 & !is.na(life_expectancy)) %>%
+  group_by(continent) %>%
+  reframe(
+      le_mean = mean(life_expectancy),
+      le_median = median(life_expectancy),
+      le_sd = sd(life_expectancy),
+      le_var = var(life_expectancy),
+      le_range = range(life_expectancy),
+      le_IQR = IQR(life_expectancy)
+      )
+```
+
+If you prefer your data in a long format, you can name a column for the summary statistics (I used `stat` here), and a column for the values (I used `value`). 
+
+```{r}
+gapminder %>% 
+  filter(year == 1986 & !is.na(life_expectancy)) %>%
+  group_by(continent) %>%
+  reframe(
+    stat = c("mean","median","sd","var","min","max","IQR"),
+    value = c(
+      le_mean = mean(life_expectancy),
+      le_median = median(life_expectancy),
+      le_sd = sd(life_expectancy),
+      le_var = var(life_expectancy),
+      le_range = range(life_expectancy),
+      le_IQR = IQR(life_expectancy)
+      )
+  )
+```
+
+
+## Frequency tables
+
+Frequency tables are useful for summarizing counts of categories, or of binned numeric values. Here, we:
+
+1. Filter to the year 2000
+2. Round fertility to the nearest whole number to create categories
+3. Build a two-way table of continent x rounded fertility
+
+Key functions/ideas:
+
+* `table()` returns counts
+* `prop.table()/proportions()` convert counts to proportions (overall by default)
+* To get row or column proportions specifically, use the margin argument (e.g., `prop.table(tab, 1)` for row proportions, `prop.table(tab, 2)` for column proportions)
+* Multiplying by 100 gives percentages and `round()` controls the displayed precision.
+
+```{r}
+library(dslabs)
+library(tidyverse)
+data(gapminder)
+
+gapminder <- gapminder %>%
+  filter(year == 2000 & !is.na(fertility)) %>%
+  mutate(fertility_cat = round(fertility))
+
+# Counts (two equivalent ways)
+fertility_table <- table(gapminder$continent, gapminder$fertility_cat)
+fertility_table
+
+fertility_table <- with(gapminder, table(continent, fertility_cat))
+fertility_table
+```
+
+```{r}
+# Overall proportions
+fertility_prop_table <- prop.table(fertility_table)
+fertility_prop_table
+
+# Rounded overall proportions
+fertility_prop_table <- round(prop.table(fertility_table), 2)
+fertility_prop_table
+
+# Same via the proportions() function
+fertility_prop_table <- round(proportions(fertility_table), 2)
+fertility_prop_table
+```
+
+```{r}
+# Percentages (overall)
+fertility_prop_table <- (round(proportions(fertility_table), 2) * 100)
+fertility_prop_table
+
+# Tip: for row-wise or column-wise proportions:
+fertility_prop_table <- round(prop.table(fertility_table, 1), 2)  # by row
+fertility_prop_table
+
+fertility_prop_table <- round(prop.table(fertility_table, 2), 2)  # by column
+fertility_prop_table
+```
+
+## The `tableone` package
+
+The `tableone` package makes journal-style "Table 1" summaries straightforward. By default, continuous variables are summarized as mean (sd) and categorical variables as counts/percentages. 
+
+You can:
+
+* Restrict to a specific year for a cross-sectional table
+* Remove missing values for a clean table
+* Specify variables to include (vars)
+* Provide a strata variable (e.g., by continent)
+* Flag non-normal variables so they print as median (IQR)
+* Add an Overall column for context
+	
+```{r}
+library(dslabs)
+library(tidyverse)
+library(tableone)
+data(gapminder)
+
+# Focus on a single year to avoid mixing calendar trends.
+table_df <- gapminder %>%
+  filter(year == 1990)
+
+# Many journals expect tables without missing values.
+# complete.cases removes all rows with any missing data.
+table_df <- table_df[complete.cases(table_df),]
+
+# Start with a quick, wide-open table to see what you have.
+t1 <- CreateTableOne(vars = names(table_df), data = table_df)
+print(t1)
+
+# Pretty printing for HTML/PDF via knitr/kable
+kableone(t1)
+```
+
+
+In practice, we usually include a targeted set of variables - and avoid variables with too many categories like the `country` column in the `gapminder` dataset. We can create a list called `vars` to specify which columns (variables) we want to include in our table. Setting `options(digits = 2)` helps control printed precision (does not change the underlying numbers).
+
+```{r}
+vars <- c("infant_mortality", "life_expectancy",
+          "fertility", "population", "gdp", 
+          "continent")
+
+t1 <- CreateTableOne(vars = vars, data = table_df)
+options(digits = 2)
+kableone(t1)
+```
+
+### Visual checks for distributional shape
+
+Before deciding whether a continuous variable is "non-normal", it’s good practice to inspect histograms. Notice that `population` and `GDP` are highly right-skewed; a log scale helps visualize their distributions more clearly.
+
+```{r, message=FALSE}
+table_df %>% 
+  ggplot(aes(infant_mortality)) +
+  geom_histogram(color = "black", fill = "darkred") +
+  xlab("Infant mortality rate (per 1,000 births)") +
+  ylab("Number of countries")
+
+table_df %>% 
+  ggplot(aes(life_expectancy)) +
+  geom_histogram(color = "black", fill = "darkred") +
+  xlab("Life expectancy (Years)") +
+  ylab("Number of countries")
+
+table_df %>% 
+  ggplot(aes(fertility)) +
+  geom_histogram(color = "black", fill = "darkred") +
+  xlab("Fertility rate") +
+  ylab("Number of countries")
+
+table_df %>% 
+  ggplot(aes(population/10^6)) +
+  geom_histogram(color = "black", fill = "darkred") +
+  xlab("Population in millions") +
+  ylab("Number of countries")
+
+table_df %>% 
+  ggplot(aes(gdp/10^9)) +
+  geom_histogram(color = "black", fill = "darkred") +
+  xlab("GDP in billions of dollars") +
+  ylab("Number of countries")
+
+# These are typically very skewed; use log scale on x to reveal structure.
+table_df %>% 
+  ggplot(aes(population/10^6)) +
+  geom_histogram(color = "black", fill = "darkred") +
+  xlab("Population in millions") +
+  ylab("Number of countries") +
+  scale_x_log10()
+
+table_df %>% 
+  ggplot(aes(gdp/10^9)) +
+  geom_histogram(color = "black", fill = "darkred") +
+  xlab("GDP in billions of dollars") +
+  ylab("Number of countries") +
+  scale_x_log10()
+```
+
+
+### Printing medians & IQRs for non-normal variables
+
+When variables are skewed (as above), report median (IQR) instead of mean (sd). In `tableone`, pass their names to the  `nonnormal` argument.
+
+```{r}
+nonNormalVars <- c("infant_mortality", "life_expectancy",
+                   "fertility", "population", "gdp")
+
+t1 <- CreateTableOne(vars = vars, data = table_df)
+options(digits = 2)
+kableone(t1, nonnormal = nonNormalVars)
+```
+
+### Stratified Table 1
+
+Stratification lets you compare groups side by side (here, continents). This is especially useful for highlighting regional differences, but be mindful of unequal group sizes.
+
+```{r}
+vars <- c("infant_mortality", "life_expectancy",
+          "fertility", "population", "gdp")
+
+nonNormalVars <- c("infant_mortality", "life_expectancy",
+                   "fertility", "population", "gdp")
+
+t1 <- CreateTableOne(vars = vars, data = table_df, 
+                     strata = "continent")
+options(digits = 2)
+kableone(t1, nonnormal = nonNormalVars)
+```
+
+Add an "Overall" column to contextualize the strata:
+
+```{r}
+vars <- c("infant_mortality", "life_expectancy",
+          "fertility", "population", "gdp")
+
+nonNormalVars <- c("infant_mortality", "life_expectancy",
+                   "fertility", "population", "gdp")
+
+t1 <- CreateTableOne(vars = vars, data = table_df, 
+                     strata = "continent", addOverall = TRUE)
+options(digits = 2)
+kableone(t1, nonnormal = nonNormalVars)
+
+```
+
+### Make tables publication-ready (labels & units)
+
+Small presentation tweaks make a big difference:
+
+* Rename variables to human-readable labels
+* Rescale units (e.g., millions or billions) so numbers are interpretable at a glance
+* Limit the number of decimal places printed
+	
+```{r}
+table_df <- gapminder %>%
+  filter(year == 1990) %>%
+  mutate(Population = population/10^6,
+         GDP = gdp/10^9) %>%
+  rename("Infant mortality" = infant_mortality, 
+         "Life expectancy" = life_expectancy,
+         "Fertility" = fertility)
+
+table_df <- table_df[complete.cases(table_df),]
+
+vars <- c("Infant mortality", "Life expectancy",
+          "Fertility", "Population", "GDP")
+
+nonNormalVars <- c("Infant mortality", "Life expectancy",
+                   "Fertility", "Population", "GDP")
+
+t1 <- CreateTableOne(vars = vars, data = table_df, 
+                     strata = "continent", addOverall = TRUE)
+options(digits = 2)
+kableone(t1, nonnormal = nonNormalVars)
+
+```
+
+
+	
