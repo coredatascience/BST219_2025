@@ -558,7 +558,6 @@ And we can see the difference between our corrected version and the misleading o
 library(tidyverse)
 library(maps)
 library(dslabs)
-library(plyr)
 data(gapminder)
 
 # Get gapminder data for 1960 and 2010
