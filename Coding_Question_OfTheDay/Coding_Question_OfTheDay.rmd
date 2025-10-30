@@ -304,6 +304,21 @@ gapminder <- gapminder %>%
          )
 ```
 
+Another (more concise) way to code the above code chunk:
+
+```{r}
+gapminder <- gapminder %>%
+  filter(year == 1999) %>%
+  mutate(life_expectancy_category = 
+         factor(case_when(
+           life_expectancy < 50 ~ "Low",
+           life_expectancy >= 75 ~ "High",
+           TRUE ~ "Medium"
+         ),
+         levels = c("Low", "Medium", "High")))
+```
+
+
 ```{r}
 gapminder %>% 
   ggplot(aes(life_expectancy_category)) +
@@ -313,8 +328,40 @@ gapminder %>%
 ```
 
 
+---
+
+### Oct 30, 2025
+
+Using the `gapminder` dataset, create a new data frame with only the `country`, `year`, `life_expectancy`, and `fertility` columns. Use the `pivot_longer()` function to reshape the dataset so that the `life_expectancy` and fertility columns are combined into a single value column called `value`. The column names should be stored in a new column called `health_indicator`.
+
+```{r}
+library(dslabs)
+library(tidyr)
+library(dplyr)
+
+data(gapminder)
+```
 
 
+--- 
+
+### Nov 4, 2025
+
+Below, a link to a dataset available on GitHub is provided. The data comes from the [Johns Hopkins University COVID-19 data repository](https://github.com/CSSEGISandData/COVID-19/tree/master).  This particular dataset contains reported COVID-19 case counts from countries around the globe from  January 22, 2020 to March 23, 2020. 
+
+Read in the data using the code provided. This dataset is currently in wide format. Convert the data frame to long format, with a column named `date` and a column named `cases`. Then, make the date column values into date objects. 
+
+Bonus challenge: rename the `Country/Region` column country. Create a new data frame with country name, date, and the total number of cases in the country on each day.
+
+```{r, message=FALSE}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+
+data <- read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/refs/heads/master/archived_data/archived_time_series/time_series_19-covid-Recovered_archived_0325.csv")
+head(data)
+```
 
 
 
