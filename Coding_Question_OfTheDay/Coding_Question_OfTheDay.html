@@ -784,6 +784,21 @@ library(tidyr)
 library(dplyr)
 
 data(gapminder)</code></pre>
+<pre class="r"><code>gap_long &lt;- gapminder %&gt;%
+  select(country, year, life_expectancy, fertility) %&gt;%
+  pivot_longer(cols = c(life_expectancy, fertility), 
+               names_to = &quot;health_indicator&quot;,
+               values_to = &quot;value&quot;)
+head(gap_long)</code></pre>
+<pre><code>## # A tibble: 6 × 4
+##   country  year health_indicator value
+##   &lt;fct&gt;   &lt;int&gt; &lt;chr&gt;            &lt;dbl&gt;
+## 1 Albania  1960 life_expectancy  62.9 
+## 2 Albania  1960 fertility         6.19
+## 3 Algeria  1960 life_expectancy  47.5 
+## 4 Algeria  1960 fertility         7.65
+## 5 Angola   1960 life_expectancy  36.0 
+## 6 Angola   1960 fertility         7.32</code></pre>
 <hr />
 </div>
 <div id="nov-4-2025" class="section level3">

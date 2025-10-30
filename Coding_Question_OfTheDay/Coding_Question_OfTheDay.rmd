@@ -342,6 +342,14 @@ library(dplyr)
 data(gapminder)
 ```
 
+```{r}
+gap_long <- gapminder %>%
+  select(country, year, life_expectancy, fertility) %>%
+  pivot_longer(cols = c(life_expectancy, fertility), 
+               names_to = "health_indicator",
+               values_to = "value")
+head(gap_long)
+```
 
 --- 
 
