@@ -823,6 +823,23 @@ head(data)</code></pre>
 ## #   `2/9/20` &lt;dbl&gt;, `2/10/20` &lt;dbl&gt;, `2/11/20` &lt;dbl&gt;, `2/12/20` &lt;dbl&gt;,
 ## #   `2/13/20` &lt;dbl&gt;, `2/14/20` &lt;dbl&gt;, `2/15/20` &lt;dbl&gt;, `2/16/20` &lt;dbl&gt;,
 ## #   `2/17/20` &lt;dbl&gt;, `2/18/20` &lt;dbl&gt;, `2/19/20` &lt;dbl&gt;, `2/20/20` &lt;dbl&gt;, …</code></pre>
+<hr />
+</div>
+<div id="nov-6-2025" class="section level3">
+<h3>Nov 6, 2025</h3>
+<p>The data frame we created on Tuesday (11/4) contains a column called
+<code>cases</code>. The values of this column are the cumulative number
+of reported cases in a particular country on a particular day. Use the
+<code>lag</code> function to add a new column to the data frame that is
+the number of new cases for each day. For example, if there were 10
+reported cases on January 22nd and 15 reported cases on January 23rd,
+the number of new cases would be 5 (15-10). Name this column
+<code>new_cases</code>.</p>
+<p>Bonus challenge: create a new column that contains the seven-day
+rolling average of new cases. Name this column
+<code>new_cases_7dayavg</code>. I would suggest using the
+<code>rollmean</code> function from the <code>zoo</code> package.</p>
+<p>This code is from the 11/4 coding question of the day.</p>
 </div>
 
 

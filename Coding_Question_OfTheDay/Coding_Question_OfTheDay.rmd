@@ -363,9 +363,15 @@ data <- read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/refs
 head(data)
 ```
 
+---
 
+### Nov 6, 2025
 
+The data frame we created on Tuesday (11/4) contains a column called `cases`. The values of this column are the cumulative number of reported cases in a particular country on a particular day. Use the `lag` function to add a new column to the data frame that is the number of new cases for each day. For example, if there were 10 reported cases on January 22nd and 15 reported cases on January 23rd, the number of new cases would be 5 (15-10). Name this column `new_cases`.
 
+Bonus challenge: create a new column that contains the seven-day rolling average of new cases. Name this column `new_cases_7dayavg`. I would suggest using the `rollmean` function from the `zoo` package. 
+
+This code is from the 11/4 coding question of the day.
 
 
 
