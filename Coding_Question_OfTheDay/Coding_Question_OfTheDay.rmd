@@ -371,6 +371,27 @@ data <- read_csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/refs
 head(data)
 ```
 
+```{r}
+long_data <- data %>%
+  pivot_longer(cols = `1/22/20`:`3/23/20`,
+               names_to = "date",
+               values_to = "cases") %>%
+  mutate(date = mdy(date))
+
+head(long_data)
+```
+
+
+```{r}
+data_long_country <- long_data %>% 
+  rename(country = "Country/Region") %>% 
+  group_by(country, date) %>%
+  dplyr::summarize(cases = sum(cases)) %>%
+  ungroup()
+
+head(data_long_country)
+```
+
 ---
 
 ### Nov 6, 2025

@@ -838,6 +838,39 @@ head(data)</code></pre>
 ## #   `2/9/20` &lt;dbl&gt;, `2/10/20` &lt;dbl&gt;, `2/11/20` &lt;dbl&gt;, `2/12/20` &lt;dbl&gt;,
 ## #   `2/13/20` &lt;dbl&gt;, `2/14/20` &lt;dbl&gt;, `2/15/20` &lt;dbl&gt;, `2/16/20` &lt;dbl&gt;,
 ## #   `2/17/20` &lt;dbl&gt;, `2/18/20` &lt;dbl&gt;, `2/19/20` &lt;dbl&gt;, `2/20/20` &lt;dbl&gt;, …</code></pre>
+<pre class="r"><code>long_data &lt;- data %&gt;%
+  pivot_longer(cols = `1/22/20`:`3/23/20`,
+               names_to = &quot;date&quot;,
+               values_to = &quot;cases&quot;) %&gt;%
+  mutate(date = mdy(date))
+
+head(long_data)</code></pre>
+<pre><code>## # A tibble: 6 × 6
+##   `Province/State` `Country/Region`   Lat  Long date       cases
+##   &lt;chr&gt;            &lt;chr&gt;            &lt;dbl&gt; &lt;dbl&gt; &lt;date&gt;     &lt;dbl&gt;
+## 1 &lt;NA&gt;             Thailand            15   101 2020-01-22     0
+## 2 &lt;NA&gt;             Thailand            15   101 2020-01-23     0
+## 3 &lt;NA&gt;             Thailand            15   101 2020-01-24     0
+## 4 &lt;NA&gt;             Thailand            15   101 2020-01-25     0
+## 5 &lt;NA&gt;             Thailand            15   101 2020-01-26     2
+## 6 &lt;NA&gt;             Thailand            15   101 2020-01-27     2</code></pre>
+<pre class="r"><code>data_long_country &lt;- long_data %&gt;% 
+  rename(country = &quot;Country/Region&quot;) %&gt;% 
+  group_by(country, date) %&gt;%
+  dplyr::summarize(cases = sum(cases)) %&gt;%
+  ungroup()</code></pre>
+<pre><code>## `summarise()` has grouped output by &#39;country&#39;. You can override using the
+## `.groups` argument.</code></pre>
+<pre class="r"><code>head(data_long_country)</code></pre>
+<pre><code>## # A tibble: 6 × 3
+##   country     date       cases
+##   &lt;chr&gt;       &lt;date&gt;     &lt;dbl&gt;
+## 1 Afghanistan 2020-01-22     0
+## 2 Afghanistan 2020-01-23     0
+## 3 Afghanistan 2020-01-24     0
+## 4 Afghanistan 2020-01-25     0
+## 5 Afghanistan 2020-01-26     0
+## 6 Afghanistan 2020-01-27     0</code></pre>
 <hr />
 </div>
 <div id="nov-6-2025" class="section level3">
