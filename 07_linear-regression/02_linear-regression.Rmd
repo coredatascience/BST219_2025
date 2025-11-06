@@ -1,0 +1,319 @@
+---
+title: "Linear Regression"
+output: 
+  html_document:
+    toc: true
+---
+
+## TL;DR
+
+In simple linear regression, we model one predictor and one outcome—for example, gestational age predicting birthweight. The slope quantifies the expected change in birthweight per additional week of gestation. We assess model fit with R², inspect diagnostic plots for linearity and homoskedasticity, and check residuals for normality. If assumptions are violated, we may add polynomial terms, apply log transformations, or use robust standard errors.
+
+Multivariable linear regression extends this framework to include multiple predictors, allowing us to adjust for potential confounders—variables that influence both the predictor and outcome. Interactions can be added to test whether the effect of one variable depends on another.
+
+We also examine collinearity, which occurs when predictors are highly correlated and inflate uncertainty around coefficients. Tools like correlation matrices and Variance Inflation Factors (VIF) help detect this problem.
+
+Finally, we compare different modeling goals:
+
+* Causal models adjust for known confounders based on domain knowledge (e.g., how maternal smoking or welfare status affect birthweight).
+
+* Predictive models prioritize accuracy and generalizability, sometimes using automated selection methods like stepwise regression or penalized approaches.
+
+Throughout, regression should be guided by both statistical evidence and substantive reasoning; not just significance tests or automatic algorithms.
+
+
+```{r, message=FALSE}
+library(tidyverse)
+library(dslabs)
+library(ggfortify)  # quick lm diagnostics
+library(corrplot)   # correlation heatmaps
+library(Hmisc)      # rcorr()
+```
+
+
+## Simple linear regression
+
+Linear regression allows us to quantify the relationship between two variables — not just whether they move together, but by how much (the magnitude). Linear regression can be used to estimate or predict the value of a continuous outcome measurement given a set of risk factors, adjust for confounders when examining the relationship between an exposure and a continuous outcome, and test for effect measure modification.
+
+Linear regression looks at the change in one variable (outcome or response or dependent variable) that corresponds to a given change in the other variable (explanatory variable or exposure or predictor or covariate or independent variable).
+
+Here, we’ll predict birthweight (`bwt`) from gestational age (`gestation`) using an ordinary least squares (OLS) linear regression model. 
+
+```{r}
+data <- read.table("KingCounty2001_data.txt", header = TRUE)
+head(data)
+```
+
+We use the `lm` function to fit the linear regression model, and the `summary` function to output important features of the model, like coefficients and confidence intervals. The primary inputs are formula and data; simple linear regression formula: `outcome ~ predictor`.
+
+```{r}
+m1 <- lm(bwt ~ gestation, data = data)
+summary(m1)
+```
+
+* Fitted regression line equation: Mean birthweight = 124.1(gestation) – 1410.7
+* Slope interpretation: for every 1 week increase in gestational age, birthweight increases by 124.1 grams on average.
+* Intercept interpretation: the estimated mean birthweight when gestational age is 0 weeks is -1410.7 grams.
+
+The p-value of the slope coefficient is used to test if the relationship between the outcome and exposure is significant. If the p-value is < 0.05, the slope is not equal to 0 and there is a statistically significant relationship between the outcome and exposure.
+
+One important use of a linear regression model is prediction of a continuous outcome.
+* Example: the predicted birthweight of a baby with gestational age equal to 40 weeks is 124.1(40) – 1410.7 = 3,553.3 grams.
+* Example: the predicted birthweight of a baby with gestational age equal to 28 weeks is 124.1(28) – 1410.7 = 2,064.1 grams.
+
+To evaluate model fit, we can use R^2. R^2 is the coefficient of determination, which quantifies the proportion of the variance in the dependent variable that is explained by the independent variable.
+R^2 ranges from 0 to 1, with higher values indicating a better fit model. In simple linear regression, R^2 is the Pearson correlation coefficient squared.
+
+Let's compute confidence intervals for these estimates using the `confint` function.
+
+```{r}
+confint(m1)
+```
+
+We can visualize the fitted regression line along with its 95% confidence interval using `geom_smooth(method = "lm", se = TRUE)`. The `method = "lm"` part tells ggplot to add the linear regression line, and `se = TRUE` tells ggplot to add confidence bands (confidence intervals) around the line. Note that the confidence bands are wider where there is less data - this is because there is less information about the relationship between gestational age and birthweight for those range of values (e.g., gestational age less than 30 weeks), which results in more uncertainty and wider confidence bands. 
+
+```{r}
+data %>%
+  ggplot(aes(gestation, bwt)) +
+  geom_point(color = "darkred") +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  labs(x = "Gestational age (weeks)", y = "Birthweight (grams)",
+       title = "OLS regression line with 95% CI")
+```
+
+### Checking assumptions
+
+Linear regression assumes:
+
+1.	The relationship between the two variables is linear.
+2.	Residuals have constant variance (homoskedasticity).
+3.	Residuals are independent and normally distributed.
+4.  We have independent observations. 
+
+We can check if assumptions 1-3 hold graphically. The function `autoplot` from the `ggfortify` package can be used to create plots to check if the assumptions of linear regression are met. Let's examine diagnostic plots and see if these assumptions are met. Four plots are created; we will use 3 of those plots.
+
+```{r, warning=FALSE}
+autoplot(m1)
+```
+
+A plot of the residuals (difference between the actual values and the values predicted with the regression line) versus the fitted values is used to check linearity. A horizontal line, without distinct patterns is an indication for a linear relationship. We do not have that here, due to the relatively small amount of data with lower values of gestational age, so this assumption is not met. A potential solution would be to transform the exposure variable (log, square root, etc.). 
+
+A plot of the square root of the standardized residuals versus the fitted values is used to check the homoscedasticity assumption. This is called a scale-location or spread-location plot. A horizontal line with equally spread points is a good indication of homoscedasticity. The homoscedasticity assumption is violated in our dataset due to the relatively small amount of data with lower values of gestational age. A potential solution would be to transform the outcome variable (log, square root, etc.).
+
+A quantile-quantile plot (Normal Q-Q plot) is used to check the normality assumption. The normality assumption is met if the standardized residuals follow the straight dashed line. Sometimes it's difficult to tell for sure if this assumption is met so we can use the Shapiro-Wilk test to test the normality assumption.
+
+
+```{r, warning=FALSE}
+shapiro.test(residuals(m1))     # normality test
+```
+
+The normality assumption is not met in the dataset since the p-value is < 0.05. A few potential solutions include applying data transformations to the exposure variable, using robust regression methods that are less sensitive to non-normal data or outliers, and removing outliers.
+
+As a final note on checking assumptions, the only way to check the independence assumption is having knowledge of the study / sampling design. You can ascertain this information by contacting those responsible for data collection, read study documentation, or create a subset of the original dataset that only includes independent pairs of observations. The independence assumption holds for this dataset.
+
+
+## Multivariate linear regression
+
+Multivariate linear regression can be used to explore more complex relationships involving a continuous outcome and two or more explanatory variables. The assumptions for multivariate linear regression are the same as simple linear regression, but we won't be checking the assumptions for the following models. 
+
+Now we'll extend the model to include multiple predictors. Multivariable regression allows us to adjust for confounders — other factors that may influence the outcome.
+
+Our new question:
+
+* After adjusting for gestational age and other maternal factors, is participation in the First Steps prenatal care program associated with higher birthweight?
+
+We can first make a boxplot to see if the distributions of birthweight are different for those who participated in the First Steps program and those did not. 
+
+```{r}
+# Create a new column for firstep for better looking plots
+data1 <- data %>% 
+  mutate(firstep_cat = as.factor(ifelse(firstep == 0, "No", "Yes")),
+         firstep = as.factor(firstep))
+
+# Look at the distribution of birthweight for each program category
+data1 %>% ggplot(aes(as.factor(firstep_cat), bwt)) +
+  geom_boxplot(fill = "darkred") +
+  ylab("Birthweight (grams)") +
+  xlab("Participation in First Steps program")
+```
+
+### Crude model 
+
+A linear regression model with one explanatory variable (exposure) of interest is called a **crude** model, and we'll start with the crude model. No other covariates have been "adjusted" for, meaning no other covariates have been added to the model yet.
+
+```{r}
+m <- lm(bwt ~ firstep, data = data)
+summary(m)
+```
+
+From this model, mean bwt = -66.18(`firstep` = 1) + 3424.69. `firstep` is called an indicator variable.
+
+Interpretation: 
+
+* Infants of participants in the First Steps program weighed, on average, 66.18 grams less at birth.
+* Mean bwt for program participants: 3358.51
+* Mean bwt for non-participants: 3424.69
+
+### Adjusted model
+
+When other covariates are added to the crude model, the model becomes an **adjusted model**. To add more covariates to a linear regression model, just use the `+` sign. The interpretations of coefficients in the model output change slightly.
+
+```{r}
+m1 <- lm(bwt ~ firstep + gestation, data = data)
+summary(m1)
+```
+
+Interpretation:
+
+* Infants of participants in the First Steps program weighed, on average, 42.037 grams less at birth, adjusting for gestational age.
+* For every 1 week increase in gestation, birthweight increases by 123.91 grams on average, holding all other covariates constant.
+
+
+### Effect Measure Modification
+
+Now suppose we wanted to test if the relationship between birthweight and gestational age is different for infants whose mothers participated in the First Steps program and those whose mothers did not participate. This is testing effect measure modification, and we can create an interaction term to test for the presence of effect measure modification. 
+
+In R, the syntax `covariate1 * covariate2` fits a model with terms `covariate1`, `covariate2`, and `covariate1 * covariate2` in it.
+
+```{r}
+m2 <- lm(bwt ~ firstep*gestation, data = data)
+summary(m2)
+```
+
+The p-value for the interaction term is not <0.05, so it should not be kept in the model. This means there is no evidence of effect measure modification.
+
+
+## Collinearity
+
+Collinearity occurs when independent variables (covariates) are highly correlated with one another. This makes it difficult for the model to estimate individual effects on the outcome variable, and inflates the variance of the regression coefficients leading to unstable estimates and wider CIs. Often, a decision about which to include in the final model is needed.
+
+We can calculate and visualize the correlation between each pair of numeric covariates. Let's first make `gender`, `smoker`, `drinker`, and `race` numeric. Here, I have chosen "white" to be the reference race group. Then we can make the other integer variables into numeric variables by using the `across` and `where` functions inside `mutate`. 
+ 
+```{r}
+data_cor <- data %>%
+  mutate(gender = ifelse(gender == "F", 0, 1),
+         smoker = ifelse(smoker == "N", 0, 1),
+         drinker = ifelse(drinker == "N", 0, 1),
+         race = case_when(
+           race == "white" ~ 0,
+           race == "hispanic" ~ 1,
+           race == "black" ~ 2,
+           race == "other" ~ 3,
+           TRUE ~ 4
+         ))
+
+data_cor <- data_cor %>%
+  mutate(across(where(is.integer), as.numeric))
+```
+
+Collinearity is usually checked with a correlation matrix, and you can specify if you would like to use Pearson or Spearman correlation, depending on the distributions of the variables. We can again use the `cor` function to calculate each correlation and save it as an object to use for plotting the correlation values. 
+
+```{r}
+# Only keep numerical variables
+vars <- c("age", "parity", "bwt", "wpre", "wgain", "education", "gestation")
+data_subset <- data_cor[, vars]
+corr_matrix <- cor(data_subset, method = "spearman")
+```
+
+We can plot the correlation values using the `corrplot` function from the `corrplot` package. The more negative the correlation, the more red the circle. The more positive the correlation, the more blue the circle. Larger absolute values of correlation result in larger circles and darker hues. 
+
+The default is a square plot that is symmetric along the diagonal with no correlation values displayed, and the names of the variables in red. Using `type = "upper"` we can remove the bottom triangle of circles since they are redundant. We can set `tl.col = "black"` to make the variable names black, and `tl.srt = 45` to put them at a 45 degree angle, making them easier to read. Adding `method = "number"` will replace the circles with the actual numerical correlation values. 
+
+```{r}
+library(corrplot)
+corrplot(corr_matrix)
+corrplot(corr_matrix, type = "upper", tl.col = "black", tl.srt = 45)
+corrplot(corr_matrix, method = "number", type = "upper", tl.col = "black", tl.srt = 45)
+```
+
+We can also use the `rcorr` function from the `Hmisc` package to print out a correlation matrix of correlation values by accessing r (`$r`). The correlation value often isn't enough and a test for each pair of covariates should be performed to see which correlations are significant. This can be done by accessing P (`$P`).
+
+
+```{r, message=FALSE}
+library(Hmisc)
+
+data_matrix <- as.matrix(data_subset)
+corr_res <- rcorr(data_matrix, type = "spearman")
+print(round(corr_res$r, digits = 2))
+print(round(corr_res$P, digits = 3))
+```
+
+
+## Model Selection
+
+Model selection is the process of identifying the best set of covariates for a model, and this depends on the type of model you are fitting, e.g., the purpose of the model. Prediction models should be parsimonious and **only** include covariates that help predict the outcome. Causal models should control for known confounders and effect measure modification, and should be based on domain knowledge or previous literature. 
+
+### Prediction models
+
+Prediction models are used to make future predictions of the outcome from a set of values from the explanatory variables (predictors). We should only include explanatory variables that help predict or explain the variability in the outcome y; this is called a parsimonious model. Stepwise selection is often used for model selection, where variables are added or removed until the best performing model is found.
+
+#### Stepwise regression
+
+Forward selection starts with an empty model (containing only the intercept), and adds variables one by one, selecting the variable that provides the most significant improvement in model fit at each step. This continues until adding no further variables significantly improves the model.
+
+The output will show iterations, and we can use the `summary` function to display the final model. In this case, the final model included `gestation`, `wpre`, `wgain`, `gender`, `smoker`, `race`, and `age`.
+
+
+```{r}
+# 1. Forward Selection
+# Start with a null model (intercept only)
+null_model <- lm(bwt ~ 1, data = data)
+
+# Define the scope of the full model
+full_scope <- formula(lm(bwt ~ firstep + gestation + gender + 
+                           age + welfare + smoker + drinker + 
+                           wpre + wgain + race, data = data))
+
+forward_model <- step(null_model, direction = "forward", scope = full_scope)
+print("Forward Selection Model:")
+print(summary(forward_model))
+```
+
+
+Backward elimination starts with a full model and removes variables one by one, eliminating the variable that contributes the least to the model's fit each time. This continues until removing no further variables significantly improves the model or all remaining variables are deemed significant.
+
+The output will show iterations, and we can again use the `summary` function to display the final model. In this case, the final model included `gestation`, `wpre`, `wgain`, `gender`, `smoker`, `race`, and `age`.
+
+
+```{r}
+# 2. Backward Elimination
+# Start with a full model
+full_model <- lm(bwt ~ firstep + gestation + gender + 
+                           age + welfare + smoker + drinker + 
+                           wpre + wgain + race, data = data)
+
+backward_model <- step(full_model, direction = "backward")
+print("Backward Elimination Model:")
+print(summary(backward_model))
+```
+
+
+Hybrid (bidirectional) selection combines both forward and backward movements at each step. At each iteration, it considers adding a new variable (like forward selection) and removing an existing variable (like backward elimination). It selects the action (add or remove) that results in the greatest improvement in model fit. This process continues until no further additions or removals improve the model.
+
+The output will show iterations, and we can again use the `summary` function to display the final model. In this case, the final model included `gestation`, `wpre`, `wgain`, `gender`, `smoker`, `race`, and `age`.
+
+
+```{r}
+# 3. Hybrid Stepwise Selection
+# Can start from a null or full model, or any intermediate model
+hybrid_model <- step(null_model, direction = "both", scope = full_scope)
+print("Hybrid Stepwise Model:")
+print(summary(hybrid_model))
+```
+
+All three methods resulted in the same final model. 
+
+
+### Causal models 
+
+Let's add known confounders to our birthweight model to see how the association between participation in the First Steps program and birthweight changes. Participants were targeted if they were young, on welfare, a smoker, and/or a drinker. We also know from previous birthweight studies in the US that race, education, mother’s weight at the beginning of the pregnancy and the amount of weight gained during pregnancy are all associated with birthweight. Let's add each of these variables to our model.
+
+```{r}
+m <- lm(bwt ~ firstep + gestation + age + welfare + 
+          smoker + drinker + wpre + wgain + race, 
+        data = data)
+summary(m)
+```
+
+From the model we can see that participation in the First Steps program is still not significant, but that the effect size has decreased from an average birthweight decrease of 42 grams to an average birthweight decrease of 20.1 grams. This suggests that the unadjusted association was partly due to confounding — differences in baseline risk between participants and non-participants.
+

@@ -1,0 +1,169 @@
+---
+title: "Correlation"
+output: 
+  html_document:
+    toc: true
+---
+
+## TL;DR
+
+Linear regression models the relationship between one or more predictors (independent variables) and an outcome (dependent variable) by estimating how much the outcome changes, on average, with each unit change in the predictors.
+
+Before fitting models, visualize and check correlations to assess direction, strength, and linearity of relationships. The Pearson correlation measures linear relationships between continuous, normally distributed variables, while the Spearman rank correlation is robust to skewness and outliers.
+
+* The Pearson correlation coefficient can be calculated with the `cor` function
+* A hypothesis test of the Pearson correlation coefficient can be conducted using the `cor.test` function
+* The Spearman correlation coefficient can be calculated with the `cor` function with argument `method = "spearman"`
+* A hypothesis test of the Spearman correlation coefficient can be conducted using the `cor.test` function with argument `method = "spearman"`
+
+
+```{r, message=FALSE}
+library(tidyverse)
+library(dslabs)
+```
+
+## Correlation
+
+Correlation quantifies the strength and direction of a linear relationship between two variables. It ranges from −1 (perfect negative linear relationship) to +1 (perfect positive linear relationship), with 0 meaning no linear relationship.
+
+In health and social data, correlation is often the first step in identifying associations that might later be modeled using regression. However, **correlation alone does not imply causation** — it only tells us that two variables move together.
+
+We'll start with an example from the `murders` dataset.
+
+```{r, message=FALSE}
+data(murders)
+```
+
+### Pearson correlation coefficient
+
+Let’s visualize the relationship between state population and the total number of gun murders. Intuitively, we expect states with larger populations to have more murders, so we should see a strong positive association.
+
+```{r}
+murders %>%
+  ggplot(aes(population/10^6, total)) +
+  geom_point(color = "darkred") +
+  xlab("Population in millions") +
+  ylab("Total number of gun murders")
+```
+
+As expected, there's a positive trend — states with larger populations tend to have more murders. However, both variables are heavily skewed: a few large-population states (like California and Texas) dominate the range.
+
+Let’s check their distributions to understand the skew.
+
+```{r}
+murders %>% 
+  ggplot(aes(population/10^6)) +
+  geom_histogram(color = "black", fill = "darkred", bins = 15) +
+  xlab("Population in millions") +
+  ylab("Number of states")
+
+murders %>% 
+  ggplot(aes(total)) +
+  geom_histogram(color = "black", fill = "darkred", bins = 15) +
+  xlab("Total number of gun murders") +
+  ylab("Number of states")
+```
+
+Both histograms are right-skewed — a few states have much higher values than the rest. This skew can distort the correlation coefficient, which assumes linearity and symmetric distributions.
+
+Let's calculate the Pearson correlation with the `cor` function, and conduct a hypothesis test to see if the correlation is statistically significant with the `cor.test` function.
+
+```{r}
+cor(murders$population, murders$total)
+cor.test(murders$population, murders$total)
+```
+
+The Pearson correlation here is very strong (small p-value) and positive. But because both variables are skewed, this may exaggerate the strength of linearity. To address that, we can transform both variables using logarithms — a common strategy for right-skewed data.
+
+```{r}
+murders %>%
+  ggplot(aes(log10(population), log10(total))) +
+  geom_point(color = "darkred") +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(x = "log10(Population)", y = "log10(Total murders)",
+       title = "Log–log relationship: Population vs. murders")
+```
+
+After the log transformation, the points line up nicely along a straight line, suggesting that the relationship between population and total murders is approximately multiplicative and linear on the log scale.
+
+### Spearman rank correlation coefficient
+
+If data are skewed or contain outliers, the Spearman rank correlation coefficient can be more robust. It uses the ranks of the data instead of raw values, so it measures whether two variables move together monotonically (in a consistent, unchanging manner), not necessarily linearly.
+
+We calculate the Spearman correlation with the `cor` function, and conduct a hypothesis test to see if the correlation is statistically significant with the `cor.test` function, but we also need to specify `method = "spearman"` in both functions.
+
+```{r, warning=FALSE}
+cor(murders$population, murders$total, method = "spearman")
+cor.test(murders$population, murders$total, method = "spearman")
+```
+
+In this case, both Pearson and Spearman correlations are high and statistically significant — confirming a strong positive association between state population and total murders.
+
+### Prenatal care example
+
+Let's apply correlation (and later linear regression) to a public health example: the relationship between gestational age (in weeks) and birthweight (in grams) in a dataset from King County, Washington.
+
+In 1989, Seattle and King County in Washington state began a program called First Steps that provides free prenatal care to low-income women. The program includes both medical attention and advice about lifestyle decisions that may affect birthweight. The goal of First Steps is to improve birth outcomes, including lower prevalence of low birthweight babies. Each observation represents a live birth, and we're interested in how much birthweight tends to increase with each additional week of gestation.
+
+Here are the variables in the dataset:
+
+* `gender`: gender of the baby (F:Female, M:Male)
+* `plural`: plurality of birth (number of babies delivered)
+* `age`: the mother’s age when giving birth
+* `race`: mother's race
+* `parity`: the number of babies the mother has given birth to
+* `married`: indicator if the mother is married (0:No, 1:Yes)
+* `bwt`: birthweight (grams)
+* `smokeN`: number of cigarettes smoked a day
+* `drinkN`: number of alcoholic drinks per week
+* `firstep`: indicator of participation in First Steps program (0:No, 1:Yes)
+* `welfare`: indicator of a mother being on welfare (0:No, 1:Yes)
+* `smoker`: indicator of a mother being a smoker (0:No, 1:Yes)
+* `drinker`: indicator of a mother being a drinker (0:No, 1:Yes)
+* `wpre`: mother’s pre-pregnancy weight in pounds
+* `wgain`: amount of maternal weight-gain during pregnancy
+* `education`: years of mother’s education
+* `gestation`: gestational age at birth (in weeks)
+
+
+```{r}
+data <- read.table("KingCounty2001_data.txt", header = TRUE)
+head(data)
+```
+
+Let’s visualize this relationship. I have plotted gestational age on the x-axis and birthweight on the y-axis, and added a black dashed line to indicate 2,500 grams, which is typically the cutoff weight for a low birthweight baby. I have added this line just for information; it has nothing to do with the correlation between gestational age and birthweight. 
+
+```{r, warning=FALSE, message=FALSE}
+data %>% ggplot(aes(gestation, bwt)) +
+  geom_point(color = "darkred") +
+  xlab("Gestational age (weeks)") +
+  ylab("Birthweight (grams)") +
+  geom_hline(yintercept = 2500, lty = 2)
+```
+
+As expected, higher gestational age is associated with higher birthweight.
+
+Let's also check the distributions of each variable to confirm they're roughly normal.
+
+```{r}
+data %>% ggplot(aes(bwt)) +
+  geom_histogram(color = "black", fill = "darkred") +
+  xlab("Birthweight (grams)")
+
+data %>% ggplot(aes(gestation)) +
+  geom_histogram(color = "black", fill = "darkred", bins = 25) +
+  xlab("Gestational age (weeks)")
+```
+
+Now compute the correlation coefficients.
+
+```{r}
+cor(data$gestation, data$bwt)
+cor.test(data$gestation, data$bwt)
+
+cor(data$gestation, data$bwt, method = "spearman")
+cor.test(data$gestation, data$bwt, method = "spearman")
+```
+
+Both correlations are positive and strong — longer pregnancies tend to result in higher birthweights. This is our motivation to fit a regression line in the next Rmd file.
+
