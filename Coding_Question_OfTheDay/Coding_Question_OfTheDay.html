@@ -885,8 +885,112 @@ the number of new cases would be 5 (15-10). Name this column
 <code>new_cases</code>.</p>
 <p>Bonus challenge: create a new column that contains the seven-day
 rolling average of new cases. Name this column
-<code>new_cases_7dayavg</code>. I would suggest using the rollmean
-function from the <code>zoo</code> package.</p>
+<code>new_cases_7dayavg</code>. I would suggest using the
+<code>rollmean</code> function from the <code>zoo</code> package.</p>
+<p>Code from 11/4 question of the day:</p>
+<pre class="r"><code>library(readr)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+
+data &lt;- read_csv(&quot;https://raw.githubusercontent.com/CSSEGISandData/COVID-19/refs/heads/master/archived_data/archived_time_series/time_series_19-covid-Recovered_archived_0325.csv&quot;)
+head(data)</code></pre>
+<pre><code>## # A tibble: 6 × 66
+##   `Province/State` `Country/Region`   Lat   Long `1/22/20` `1/23/20` `1/24/20`
+##   &lt;chr&gt;            &lt;chr&gt;            &lt;dbl&gt;  &lt;dbl&gt;     &lt;dbl&gt;     &lt;dbl&gt;     &lt;dbl&gt;
+## 1 &lt;NA&gt;             Thailand         15     101           0         0         0
+## 2 &lt;NA&gt;             Japan            36     138           0         0         0
+## 3 &lt;NA&gt;             Singapore         1.28  104.          0         0         0
+## 4 &lt;NA&gt;             Nepal            28.2    84.2         0         0         0
+## 5 &lt;NA&gt;             Malaysia          2.5   112.          0         0         0
+## 6 British Columbia Canada           49.3  -123.          0         0         0
+## # ℹ 59 more variables: `1/25/20` &lt;dbl&gt;, `1/26/20` &lt;dbl&gt;, `1/27/20` &lt;dbl&gt;,
+## #   `1/28/20` &lt;dbl&gt;, `1/29/20` &lt;dbl&gt;, `1/30/20` &lt;dbl&gt;, `1/31/20` &lt;dbl&gt;,
+## #   `2/1/20` &lt;dbl&gt;, `2/2/20` &lt;dbl&gt;, `2/3/20` &lt;dbl&gt;, `2/4/20` &lt;dbl&gt;,
+## #   `2/5/20` &lt;dbl&gt;, `2/6/20` &lt;dbl&gt;, `2/7/20` &lt;dbl&gt;, `2/8/20` &lt;dbl&gt;,
+## #   `2/9/20` &lt;dbl&gt;, `2/10/20` &lt;dbl&gt;, `2/11/20` &lt;dbl&gt;, `2/12/20` &lt;dbl&gt;,
+## #   `2/13/20` &lt;dbl&gt;, `2/14/20` &lt;dbl&gt;, `2/15/20` &lt;dbl&gt;, `2/16/20` &lt;dbl&gt;,
+## #   `2/17/20` &lt;dbl&gt;, `2/18/20` &lt;dbl&gt;, `2/19/20` &lt;dbl&gt;, `2/20/20` &lt;dbl&gt;, …</code></pre>
+<pre class="r"><code>long_data &lt;- data %&gt;%
+  pivot_longer(cols = `1/22/20`:`3/23/20`,
+               names_to = &quot;date&quot;,
+               values_to = &quot;cases&quot;) %&gt;%
+  mutate(date = mdy(date))
+
+head(long_data)</code></pre>
+<pre><code>## # A tibble: 6 × 6
+##   `Province/State` `Country/Region`   Lat  Long date       cases
+##   &lt;chr&gt;            &lt;chr&gt;            &lt;dbl&gt; &lt;dbl&gt; &lt;date&gt;     &lt;dbl&gt;
+## 1 &lt;NA&gt;             Thailand            15   101 2020-01-22     0
+## 2 &lt;NA&gt;             Thailand            15   101 2020-01-23     0
+## 3 &lt;NA&gt;             Thailand            15   101 2020-01-24     0
+## 4 &lt;NA&gt;             Thailand            15   101 2020-01-25     0
+## 5 &lt;NA&gt;             Thailand            15   101 2020-01-26     2
+## 6 &lt;NA&gt;             Thailand            15   101 2020-01-27     2</code></pre>
+<pre class="r"><code>data_long_country &lt;- long_data %&gt;% 
+  rename(country = &quot;Country/Region&quot;) %&gt;% 
+  group_by(country, date) %&gt;%
+  dplyr::summarize(cases = sum(cases)) %&gt;%
+  ungroup()</code></pre>
+<pre><code>## `summarise()` has grouped output by &#39;country&#39;. You can override using the
+## `.groups` argument.</code></pre>
+<pre class="r"><code>head(data_long_country)</code></pre>
+<pre><code>## # A tibble: 6 × 3
+##   country     date       cases
+##   &lt;chr&gt;       &lt;date&gt;     &lt;dbl&gt;
+## 1 Afghanistan 2020-01-22     0
+## 2 Afghanistan 2020-01-23     0
+## 3 Afghanistan 2020-01-24     0
+## 4 Afghanistan 2020-01-25     0
+## 5 Afghanistan 2020-01-26     0
+## 6 Afghanistan 2020-01-27     0</code></pre>
+<p>New code for today’s question:</p>
+<pre class="r"><code>library(zoo)
+
+# Calculate new cases
+data_long_country &lt;- data_long_country %&gt;% 
+  group_by(country) %&gt;%
+  arrange(date) %&gt;% # Put rows in chronological order
+  mutate(new_cases = cases - lag(cases)) %&gt;%
+  ungroup()
+head(data_long_country)
+tail(data_long_country)</code></pre>
+<pre class="r"><code># Calculate 7-day rolling average of new cases
+data_long_country &lt;- data_long_country %&gt;% 
+  group_by(country) %&gt;%
+  arrange(date, .by_group=TRUE) %&gt;%  # Put rows in chronological order
+  mutate(new_cases_7dayavg = rollmean(new_cases, k = 7, fill = NA)) %&gt;%
+  ungroup()
+head(data_long_country)</code></pre>
+<pre class="r"><code>library(zoo)
+
+# Calculate new cases
+data_long_country &lt;- data_long_country %&gt;% 
+  group_by(country) %&gt;%
+  arrange(date) %&gt;% # Put rows in chronological order
+  mutate(new_cases = cases - lag(cases)) %&gt;%
+  mutate(new_cases_7dayavg = rollmean(new_cases, k = 7, fill = NA)) %&gt;%
+  ungroup()
+head(data_long_country)</code></pre>
+<pre><code>## # A tibble: 6 × 5
+##   country             date       cases new_cases new_cases_7dayavg
+##   &lt;chr&gt;               &lt;date&gt;     &lt;dbl&gt;     &lt;dbl&gt;             &lt;dbl&gt;
+## 1 Afghanistan         2020-01-22     0        NA                NA
+## 2 Albania             2020-01-22     0        NA                NA
+## 3 Algeria             2020-01-22     0        NA                NA
+## 4 Andorra             2020-01-22     0        NA                NA
+## 5 Angola              2020-01-22     0        NA                NA
+## 6 Antigua and Barbuda 2020-01-22     0        NA                NA</code></pre>
+<pre class="r"><code>tail(data_long_country)</code></pre>
+<pre><code>## # A tibble: 6 × 5
+##   country    date       cases new_cases new_cases_7dayavg
+##   &lt;chr&gt;      &lt;date&gt;     &lt;dbl&gt;     &lt;dbl&gt;             &lt;dbl&gt;
+## 1 Uruguay    2020-03-23     0         0                NA
+## 2 Uzbekistan 2020-03-23     0         0                NA
+## 3 Venezuela  2020-03-23    15         0                NA
+## 4 Vietnam    2020-03-23    17         0                NA
+## 5 Zambia     2020-03-23     0         0                NA
+## 6 Zimbabwe   2020-03-23     0         0                NA</code></pre>
 </div>
 
 
