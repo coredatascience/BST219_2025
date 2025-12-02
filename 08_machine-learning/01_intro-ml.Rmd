@@ -1,6 +1,8 @@
 ---
 title: "Introduction to Machine Learning"
-output: html_document
+output: 
+  html_document:
+    toc: true
 ---
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
@@ -130,7 +132,38 @@ The machine learning task is to build an algorithm that returns a prediction for
 
 # Case Study 2: Melanoma
 
-Here we consider a prediction task based on the `melanoma` data from the `boot` package, which records tumor thickness (mm) and survival status after tumor removal for 205 patients with malignant melanoma. For this two-class problem, we will focus only on patients who either died from melanoma (`1`) or were still alive at the end of the study (`2`), and drop who died of other causes. 
+In this case study, we will walk through a complete binary classification workflow using the `melanoma` dataset from the `boot` package. The dataset contains information on tumor characteristics and survival outcomes for 205 patients diagnosed with malignant melanoma.
+
+Our goal is to predict whether a patient died from melanoma, using only the tumor thickness as a predictor. This gives us a simple but instructive classification problem, allowing us to compare different modeling strategies:
+* Logistic Regression
+* Naïve Bayes
+* Models evaluated with k-fold cross-validation
+* k-Nearest Neighbors
+
+This case study mirrors a realistic medical prediction scenario:
+
+*Given a new patient with a tumor of a certain thickness, what is the probability that they will die from melanoma?*
+
+To simplify the problem and focus on the classification task itself we will focus only on patients who either died from melanoma (`1`) or were still alive at the end of the study (`2`), and drop anyone who died of other causes. 
+
+Key variables:
+
+* `time`: survival time in days
+* `status`: event indicator  
+  - 1 = died from melanoma  
+  - 2 = alive at end of study
+  - 3 = died from other causes
+* `age`: age in years at time of operation
+* `sex`: 0 = female, 1 = male
+* `year`: year of operation
+* `thickness`: tumor thickness (mm)
+* `ulcer`: 0 = no ulceration, 1 = ulceration present
+
+Before fitting any models, we will preprocess the dataset to:
+
+1. Keep only the two relevant outcomes (died from melanoma vs. alive)
+2. Convert the outcome into a human-readable factor (Dead, Alive)
+3. Create a binary numerical outcome (y) for modeling
 
 ```{r, message=FALSE}
 library(tidyverse)
@@ -147,9 +180,13 @@ melanoma <- melanoma %>%
 head(melanoma)
 ```
 
+Let's check class balance. This step is essential because imbalanced classes can strongly influence how we interpret accuracy, ROC curves, and model performance.
+
 ```{r}
 table(melanoma$status)
 ```
+
+We can see that there is class imbalance: most patients (70.2%) did not die during the study period. We will take this into account when splitting our data into training and test sets.
 
 ```{r}
 melanoma %>%
@@ -158,6 +195,9 @@ melanoma %>%
   xlab("") +
   ylab("Tumor thickness (mm)")
 ```
+
+
+Let's split our data into training and test sets. We'll use `set.seed` to ensure our training and test sets are the same every time we run the code. Because of the class imbalance, we use stratified sampling so that both sets have a similar proportion of Dead/Alive outcomes. This is done using the `stratified` function from the `splitstackshape` package.
 
 
 ```{r, message=FALSE}
@@ -170,6 +210,8 @@ train_index <- as.numeric(x$rn)
 test_set    <- melanoma[-train_index,]
 ```
 
+Check that the split looks correct:
+
 ```{r}
 dim(train_set)
 head(train_set)
@@ -177,12 +219,17 @@ dim(test_set)
 head(test_set)
 ```
 
+## Logistic regression
+
+Logistic regression is a parametric, interpretable model widely used in clinical research. Here, it models the log-odds of death as a function of tumor thickness. We use the `glm` function and specify the model (`y ~ thickness`), the data to use (`train_set`) and `family = "binomial"` to indicate we want a logistic regression model (there are several models available and we have to be specific). 
 
 ```{r}
 fit_logit <- glm(y ~ thickness,
                 data = train_set, 
                 family = "binomial")
 ```
+
+Logistic regression outputs estimated probabilities of death (`p-hat`), which we need to convert to 0s and 1s (`y_hat`) based on a threshold. We will use 0.5 as the threshold. 
 
 ```{r}
 p_hat_logit <- predict(fit_logit, 
@@ -191,23 +238,29 @@ p_hat_logit <- predict(fit_logit,
 
 head(p_hat_logit)
 
-y_hat_logit <- ifelse(p_hat_logit > 0.5, "Dead", "Alive")
+y_hat_logit <- ifelse(p_hat_logit >= 0.5, "Dead", "Alive")
 
 head(y_hat_logit)
 ```
 
+We can now evaluate classification performance by producing the confusion matrix. The confusion matrix gives insight into sensitivity (recall for `Dead` class), specificity, overall accuracy, F1 score, which is especially useful when classes are uneven or misclassification costs differ, etc.
+
 ```{r, message=FALSE}
 library(caret)
-cm <- confusionMatrix(data = as.factor(y_hat_logit), 
+cm_logit <- confusionMatrix(data = as.factor(y_hat_logit), 
                 reference = test_set$status, positive = "Dead")
-cm
-cm$byClass["F1"]
+cm_logit
+cm_logit$byClass["F1"]
 ```
+
+ROC curves provide a threshold-independent view of model performance. We can first calculate the sensitivity and specificity for different thresholds using the `roc` function from the `pROC` package.
 
 ```{r, message=FALSE}
 library(pROC)
 roc_logit <- roc(test_set$y, p_hat_logit)
 ```
+
+We can then plot the ROC curve using `ggroc`. Here, `list` is a way to label each curve in the plot in a readable way.
 
 ```{r}
 ggroc(list("Logistic regression" = roc_logit)) +
@@ -219,12 +272,18 @@ ggroc(list("Logistic regression" = roc_logit)) +
   xlab("Specificity") 
 ```
 
+AUROC (AUC) is often preferred over accuracy in medical settings because it is insensitive to class imbalance and reflects how well the model ranks patients by risk. To calculate the AUROC, we can use the `auc` function. 
+
 ```{r}
 auc(roc_logit)
 ```
 
 
 ## Naive Bayes
+
+Naïve Bayes is a probabilistic classifier that assumes predictors are conditionally independent within each class. Although this assumption is rarely exactly true in practice, Naïve Bayes often performs well, especially for simple or high-dimensional datasets.
+
+We will use the `naiveBayes` function from the `e1071` package to train the model. The rest of the workflow is exactly what we did when we trained the logistic regression model. 
 
 ```{r, message=FALSE}
 library(e1071)
@@ -234,14 +293,16 @@ fit_nb   <- naiveBayes(y ~ thickness, data = train_set)
 p_hat_nb <- predict(fit_nb, test_set, type = "raw")[,2]
 head(p_hat_nb)
 
-y_hat_nb <- ifelse(p_hat_nb > 0.5, "Dead", "Alive")
+y_hat_nb <- ifelse(p_hat_nb >= 0.5, "Dead", "Alive")
 head(y_hat_nb)
 
-cm <- confusionMatrix(data = as.factor(y_hat_nb), 
+cm_nb <- confusionMatrix(data = as.factor(y_hat_nb), 
                       reference = test_set$status, positive = "Dead")
-cm
-cm$byClass["F1"]
+cm_nb
+cm_nb$byClass["F1"]
 ```
+
+We can add the Naive Bayes ROC curve to the plot to compare the models. 
 
 ```{r, message=FALSE}
 roc_nb <- roc(test_set$y, p_hat_nb)
@@ -258,8 +319,13 @@ ggroc(list("Logistic regression" = roc_logit,
 auc(roc_nb)
 ```
 
+The logistic regression model is performing better in terms of AUROC. 
 
-## k-fold cross validation
+## k-fold cross validation (CV)
+
+Cross-validation helps us assess how well a model will generalize and allows us to evaluate performance using metrics beyond accuracy, including AUC.
+
+Here we re-code the outcome for caret:
 
 ```{r}
 melanoma <- melanoma %>% 
@@ -271,7 +337,12 @@ melanoma <- melanoma %>%
          y = as.factor(ifelse(status == "Dead", 1, 0)))
 ```
 
+For 10-fold cross-validation specify:
 
+* Probability estimates returned (`classProbs = TRUE`)
+* ROC/AUC as the optimization metric (`summaryFunction = twoClassSummary`)
+* k-fold CV (`method = "cv"`, `number = 10`)
+	
 ```{r}
 set.seed(123)
 
@@ -282,6 +353,8 @@ cv10 <- trainControl(
   summaryFunction = twoClassSummary
 )
 ```
+
+Logistic Regression with CV. Here, caret selects the model with the highest cross-validated AUC.
 
 ```{r}
 log_cv <- train(
@@ -295,6 +368,9 @@ log_cv <- train(
 
 log_cv
 ```
+
+
+Naive Bayes with CV. Here, caret selects the model with the highest cross-validated AUC.
 
 ```{r, message=FALSE}
 library(naivebayes)
@@ -316,9 +392,9 @@ p_hat_logit_cv <- predict(log_cv, test_set, type = "prob")[,2]
 y_hat_logit_cv <- factor(ifelse(p_hat_logit_cv >= 0.5, "Dead", "Alive"),
                       levels=c("Alive","Dead"))
 
-cm <- confusionMatrix(y_hat_logit_cv, test_set$status, positive = "Dead")
-cm
-cm$byClass["F1"]
+cm_logit <- confusionMatrix(y_hat_logit_cv, test_set$status, positive = "Dead")
+cm_logit
+cm_logit$byClass["F1"]
 ```
 
 ```{r}
@@ -327,9 +403,9 @@ p_hat_nb_cv    <- predict(nb_cv, test_set, type = "prob")[,2]
 y_hat_nb_cv  <- factor(ifelse(p_hat_nb_cv >= 0.5, "Dead", "Alive"),
                       levels=c("Alive","Dead"))
 
-cm <- confusionMatrix(y_hat_nb_cv,  test_set$status, positive = "Dead")
-cm
-cm$byClass["F1"]
+cm_nb <- confusionMatrix(y_hat_nb_cv,  test_set$status, positive = "Dead")
+cm_nb
+cm_nb$byClass["F1"]
 ```
 
 ```{r, message=FALSE}
@@ -348,6 +424,124 @@ ggroc(list("Logistic regression" = roc_logit_cv,
 auc(roc_logit_cv)
 auc(roc_nb_cv)
 ```
+
+
+## k-Nearest Neighbors (KNN)
+
+We will now introduce the **k-nearest neighbors (KNN)** algorithm for classification and demonstrate how to use cross-validation to choose the tuning parameter **k**. We will again use the `melanoma` dataset from the `boot` package as a real-world example.
+
+The **k-Nearest Neighbors (KNN)** algorithm is a simple, non-parametric method for classification and regression based on distance. Distance is usually [Euclidean distance](https://en.wikipedia.org/wiki/Euclidean_distance) or the [Manhattan distance](https://en.wikipedia.org/wiki/Taxicab_geometry). 
+
+Here are the steps for classification:
+
+1. To predict the class of a new observation, we compute the **distance** between the new point and every observation in the training set.
+2. We find the **k closest** (nearest) observations according to this distance.
+3. We assign the new point the **majority class** among those neighbors.
+
+Important points about KNN:
+
+* KNN does not learn an explicit model with parameters, unlike logistic regression and Naive Bayes
+* Predictions are based on local neighborhoods in the **feature space** (predictor space).
+* The choice of distance metric (commonly Euclidean) and the scale of features matter a lot - small changes can result in large differences in predictions and prediction accuracy
+* The tuning parameter **k** controls the flexibility:  
+  - Small k = more flexible, higher variance, more sensitive to noise, usually les bias
+  - Large k = smoother decision boundary, higher bias
+
+Because KNN relies on distances, features with larger numerical ranges can dominate the distance calculation. Therefore, **standardizing** continuous predictors (e.g., centering and scaling) is crucial.
+
+
+### Cross-validation setup
+
+We will again use the `caret` package to implement KNN with cross-validation. We'll use 10-fold cross-validation (`number = 10`) just as we did with logistic regression and Naive Bayes. The same `trainControl` function is written below but in practice you would only need to define it once. 
+
+```{r cv-control}
+set.seed(123)
+
+cv10 <- trainControl(
+  method = "cv",
+  number = 10,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary
+)
+
+```
+
+### Fitting KNN with cross-validation
+
+We define a grid of **k** values to try, for example from 3 to 25 by steps of 2. The `train()` function will fit models for each candidate value of *k*. We will also instruct `caret` to **center and scale** (standardize) our predictors. Here we are only using thickness. We then call `train()` with:
+
+* `method = "knn"` for KNN
+* `trControl = cv10` to specify our cross-validation
+* `preProcess = c("center", "scale")` so that KNN uses standardized predictors
+* `tuneGrid` to define which k values to try
+* `metric = "ROC"` to save sensitivity, specificity, and AUROC for each value of k
+
+```{r}
+k_grid <- data.frame(k = seq(3, 25, by = 2))
+
+knn_cv <- train(
+  status ~ thickness,
+  data = train_set,
+  method = "knn",
+  trControl = cv10,
+  preProcess = c("center", "scale"),
+  tuneGrid = k_grid,
+  metric = "ROC"
+)
+
+knn_cv
+```
+
+The printed output shows the cross-validated performance (AUROC) for each value of **k**, as well as the **best** k chosen by `caret` (here, k = 19). We can visualize the relationship between **k** and accuracy:
+
+```{r plot-knn}
+plot(knn_cv)
+```
+
+
+Once we choose the best value of **k** based on cross-validation, we can evaluate the model on the held-out test data.
+
+```{r predict-knn}
+# Predictions on the test set
+p_hat_knn_cv <- predict(knn_cv, newdata = test_set, type = "prob")[,2]
+
+# Converting probabilities to 0 or 1
+y_hat_knn_cv  <- factor(ifelse(p_hat_knn_cv >= 0.5, "Dead", "Alive"),
+                        levels = c("Alive","Dead"))
+
+# Confusion matrix
+cm_knn <- confusionMatrix(y_hat_knn_cv, test_set$status, positive = "Dead")
+cm_knn
+cm_knn$byClass["F1"]
+```
+
+## Comparing models
+
+Let's compare this model to the models we trained using logistic regression and Naive Bayes. We will calculate the AUC and plot the ROC curves. 
+
+```{r, message=FALSE}
+roc_logit_cv <- roc(test_set$y, p_hat_logit_cv)
+roc_nb_cv    <- roc(test_set$y, p_hat_nb_cv)
+roc_knn_cv   <- roc(test_set$y, p_hat_knn_cv)
+
+ggroc(list("Logistic regression" = roc_logit_cv,
+           "Naive Bayes" = roc_nb_cv,
+           "KNN" = roc_knn_cv)) +
+  theme(legend.title = element_blank()) +
+  geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1), 
+               color = "black", 
+               linetype = "dashed") +
+  ylab("Sensitivity") +
+  xlab("Specificity") 
+
+auc(roc_logit_cv)
+auc(roc_nb_cv)
+auc(roc_knn_cv)
+```
+
+The AUC values are all very close with KNN in the lead. 
+
+
 
 
 
