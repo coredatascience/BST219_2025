@@ -1,0 +1,298 @@
+---
+title: "Classification and Regression Trees (CART)"
+output: 
+  html_document:
+    toc: true
+---
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(readr)
+```
+
+## The Curse of Dimensionality
+
+Thus far we have described two types of machine learning algorithms: linear approaches (Logistic Regression and Naive Bayes), and a smoothing approach (k-Nearest Neighbors). A limitation of these approaches is that with a large number of predictors, we run into the problem of _the curse of dimensionality_.
+
+The curse of dimensionality refers to various phenomena that arise when analyzing and organizing data in high-dimensional spaces that do not occur in low-dimensional settings such as the three-dimensional physical space of everyday experience. 
+
+The common theme of these problems is that when the dimensionality increases, the volume of the space increases so fast that the available data become sparse. In order to obtain a reliable result, the amount of data needed often grows exponentially with the dimensionality. Also, organizing and searching data often relies on detecting areas where objects form groups with similar properties; in high dimensional data, however, all objects appear to be sparse and dissimilar in many ways, which prevents common data organization strategies from being efficient.
+
+Here we look at a set of elegant and versatile methods that adapt to higher dimensions and also allow these regions to take more complex shapes, but still produce models that are interpretable. These are very popular, well-known and studied methods. We will concentrate on Regression and Classification Trees and their extension to Random Forests.
+
+## Decision Trees
+
+Consider the olives dataset below. We show two measured predictors, `linoleic` (percent linoleic acid of sample) and `eicosenoic` (percent eicosenoic acid of sample). Suppose we wanted to predict the olive's region using these two predictors.
+
+```{r, message=FALSE, warning=FALSE}
+olives <- read.csv("https://raw.githubusercontent.com/datasciencelabs/data/master/olive.csv", as.is = TRUE) %>% tbl_df
+names(olives)[1] <- "province"
+region_names <- c("Southern Italy", "Sardinia", "Northern Italy")
+olives <- olives %>% mutate(Region = factor(region_names[Region]))
+
+p <- olives %>% ggplot(aes(eicosenoic, linoleic, fill = Region)) +
+     geom_point(pch = 21)
+p
+```
+
+Note that we can describe a classification algorithm that would work pretty much perfectly:
+
+```{r}
+p <- p + geom_vline(xintercept = 6.5) + 
+         geom_segment(x = -2, y = 1053.5, xend = 6.5, yend = 1053.5)
+p
+```
+
+The prediction algorithm inferred from the figure above is what we call a decision tree. If eicosnoic is larger than 6.5, predict Southern Italy. If not, then if linoleic is larger than 1,054, predict Sardinia and Northern Italy otherwise. We can draw this decision tree like this:
+
+```{r, echo=FALSE}
+library(rpart)
+library(rpart.plot)
+
+olives <- olives %>% dplyr::select(., Region, linoleic, eicosenoic)
+
+fit <- rpart(as.factor(Region) ~ ., data = olives)
+
+rpart.plot(fit)
+```
+
+Decision trees like this are often used in practice. For example, to decide if a person is at risk of having a heart attack, doctors may use the following:
+
+![](http://nargund.com/gsu/mgs8040/resource/dss/Simple%20Heuristics%20That%20Make%20Us%20Smart_files/todd.fig1.gif)
+
+
+The general idea of the methods we are describing is to define an algorithm that uses data to create these tress. Regression and decision trees operate by predicting an outcome variable $Y$ by **partitioning** feature (predictor) space.
+
+## Regression Trees
+
+Let's start with the case of a **continuous** outcome. The general idea here is to build a decision tree and at the end of each _node_ we will have a different prediction $\hat{Y}$ for the outcome $Y$.
+
+The **regression** tree model then:
+
+1. Partitions space into $J$ non-overlapping regions, $R_1, R_2, \ldots, R_J$.
+2. For every observation that falls within region $R_j$, predict the response as the mean of responses for training observations in $R_j$.
+
+The important observation is that **Regression Trees create partitions recursively**.
+
+For example, consider finding a good predictor $j$ to partition space along its axis. A recursive algorithm would look like this:
+
+Find predictor $j$ and value $s$ that minimize RSS:
+
+$$
+\sum_{i:\, x_i \in R_1(j,s))} (y_i - \hat{y}_{R_1})^2 +
+\sum_{i:\, x_i \in R_2(j,s))} (y_i - \hat{y}_{R_2})^2
+$$
+
+Where $R_1$ and $R_2$ are regions resulting from splitting observations on predictor $j$ and value $s$:
+
+$$
+R_1(j,s) = \{X|X_j < s\} \text{ and } R_2(j,s) \{X|X_j \geq s\}
+$$
+
+This is then applied recursively to regions $R_1$ and $R_2$. Within each region a prediction is made using $\hat{y}_{R_j}$ which is the mean of the response $Y$ of observations in $R_j$.
+
+Let's take a look at what this algorithm does on the `Boston Housing` data set. This dataset contains information collected by the U.S Census Service concerning housing in the area of Boston, MA in the 1970s. It was obtained from the [StatLib archive](http://lib.stat.cmu.edu/datasets/boston). It contains information including `medv` (median value of owner-occupied homes in $1000's), `lstat` (% of individuals with lower socioeconomic status), `rm` (average number of rooms per dwelling), and `dis` (weighted distances to five Boston employment centres), among others with a total of 14 variables. 
+
+The dataset is small in size with only 506 cases, but we'll use it for educational purposes.
+
+We can use the `tree` package and use the `tree` function to fit the decision tree and plot the tree.
+
+```{r, message=FALSE, warning=FALSE}
+library(tree)
+library(MASS)
+library(caret)
+
+set.seed(1)
+
+# Randomly sample 70% of the data for training
+train_index <- createDataPartition(y = Boston$medv, p = 0.7, list = FALSE)
+
+train_set <- Boston[train_index, ]
+test_set  <- Boston[-train_index, ]
+
+# Fit a regression tree using all of the available predictors
+fit = tree(medv ~ ., data = train_set)  
+
+# Print a summary of the tree
+summary(fit)
+```
+
+```{r}
+plot(fit, type = "uniform")
+text(fit, pretty = 0)
+```
+
+```{r}
+# Use tree for prediction
+preds <- predict(fit, newdata = test_set)
+```
+
+The tree suggests that houses with a higher number of rooms correspond to more expensive houses and predicts a median house price of $44,630 for a house with more than 7 rooms. 
+
+The idea behind the regression tree is that the outcome $Y$ is estimated (or predicted) to be it's mean _within each of the data partitions_. Think of it as the conditional mean of $Y$ where conditioning is given by this region partitioning. 
+
+We can also use the predictions made to calculate MSE (mean square error) to compare models. 
+
+```{r}
+test <- test_set$medv
+plot(preds, test)
+abline(0,1)
+
+mean((preds-test)^2)
+sqrt(mean((preds-test)^2))
+```
+
+The test set MSE associated with this tree is 19.1. The square root of the MSE is 4.37, indicating this model leads to test predictions that are within approximately $4,370 of the true median home value for the suburb.
+
+
+The `rpart` package is an alternative method for fitting trees in R. It is much more feature rich, including performing cross-validation by default. It also has the ability to produce much nicer looking tree visualizations. Based on its default settings, it will often result in smaller trees than when using the `tree` package.
+
+```{r, message=FALSE, warning=FALSE}
+library(rpart)
+set.seed(1)
+
+# Fit a regression tree using all of the available predictors
+fit_rpart = rpart(medv ~ ., data = train_set)  
+
+# Print a summary of the tree
+summary(fit_rpart)
+
+# Use tree for prediction
+preds <- predict(fit_rpart, newdata = test_set)
+```
+
+Let's plot the resulting tree:
+
+```{r}
+rpart.plot(fit_rpart, digits = 4)
+```
+
+We get a similar but different tree than we did using the `tree` function. This tree has 8 terminal nodes (leaves) whereas the one before had 9 . We can also calculate the MSE and RMSE and compare the models:
+
+```{r}
+mean((preds-test)^2)
+sqrt(mean((preds-test)^2))
+```
+
+This model has slightly higher MSE and RMSE. 
+
+### Specifics of the regression tree algorithm
+
+The recursive partitioning algorithm described above leads to a set of natural questions:
+
+1. _When do we stop partitioning?_ 
+
+We stop when adding a partition does not reduce MSE, or, when a partition has too few training observations. Even then, trees built with this stopping criterion tend to _overfit_ to the training data. To avoid this, a post-processing step called **pruning** is used to make the tree smaller.
+
+2. Why would a smaller tree tend to generalize better?
+
+Pruning a decision tree simplifies the model, preventing it from overfitting the training data by removing branches that capture noise rather than genuine patterns. This simplification makes the model less complex, which improves its performance on new, unseen data. 
+
+When using the `tree` function from the `tree` package, the `cv.tree` function is used to determine a reasonable tree depth for the given dataset. For this dataset it seems that a depth of 8 works well since it reaches the minimum error or "deviance" with that number:
+
+```{r}
+set.seed(1)
+cv_boston = cv.tree(fit)
+plot(cv_boston$size, cv_boston$dev, type = 'b')
+```
+
+However, if we decide to prune a tree we can do so using the `prune.tree()` function:
+
+```{r}
+prune_boston = prune.tree(fit, best = 5)
+plot(prune_boston, type = "uniform")
+text(prune_boston)
+```
+
+Let's calculate the test set MSE for the pruned tree:
+
+```{r}
+preds_prune <- predict(prune_boston, newdata = test_set)
+test = test_set$medv
+mean((preds_prune-test)^2)
+sqrt(mean((preds_prune-test)^2))
+```
+
+The MSE of the pruned tree is greater than the original, so we should not prune this decision tree.
+
+We can also prune a tree using the `prune` function from the `rpart` package. Just as we did with the `tree` function above, we can first plot the error for different tree sizes. The error is the smallest with 8 leaves or terminal nodes. But, we can prune the tree to 5 terminal nodes using a _complexity parameter_ (`cp`) of 0.028. 
+
+```{r}
+set.seed(1)
+fit_rpart = rpart(medv ~ ., data = train_set)  
+```
+
+```{r}
+p <- prune(fit_rpart, cp = 0.028)
+rpart.plot(p, digits = 4)
+preds <- predict(p, newdata = test_set)
+```
+
+```{r}
+mean((preds-test)^2)
+sqrt(mean((preds-test)^2))
+```
+
+Now the trees are identical and have the same MSE/RMSE. 
+
+
+## Random Forests
+
+Random Forests are a **very popular** approach that address the shortcomings of decision trees via re-sampling of the training data. Their goal is to improve prediction performance and reduce instability by _averaging_ multiple decision trees (a forest constructed with randomness). It has two features that help accomplish this.
+
+The first trick is *Bagging* (bootstrap aggregation)
+General scheme:
+
+  1. Build many decision trees $T_1, T_2, \ldots, T_B$ from training set
+  2. Given a new observation, let each $T_j$ predict $\hat{y}_j$
+  3. For regression: predict average $\frac{1}{B} \sum_{j=1}^B \hat{y}_j$,
+     for classification: predict with majority vote (most frequent class)
+     
+But how do we get many decision trees from a single training set?
+
+For this we use the _bootstrap_. To create $T_j, \, j=1,\ldots,B$ from a training set of size $N$:
+
+a) Create a bootstrap training set by sampling $N$ observations from training set **with replacement**
+b) Build a decision tree from the bootstrap training set
+
+Let's look at this using the Boston housing dataset. We fit a Random Forest by using the `randomForest()` function. Here, `mtry = 13` indicates all 13 predictors should be considered for each split of the tree - in other words, bagging should be done. 
+
+```{r, message=FALSE, warning=FALSE}
+library(randomForest)
+library(MASS)
+fit_bag <- randomForest(medv ~ ., data = train_set, mtry = 13)
+fit_bag
+```
+
+How well does it perform on the test set?
+
+```{r}
+preds_bag = predict(fit_bag, newdata = test_set)
+plot(preds_bag, test)
+abline(0,1)
+mean((preds_bag - test)^2)
+sqrt(mean((preds_bag - test)^2))
+```
+
+Much, much better than the one decision tree we used above. With Random Forest we get an MSE of 9.21 which (after square rooting) translates to our predictions being within $3,035 of the true median home value for the suburb. 
+
+This is much lower than the $4,370 we got when using the one decision tree.
+
+The second Random Forest feature is to use a random selection of features to split when deciding partitions. Specifically, when building each tree $T_j$, at each recursive partition only consider a _randomly selected subset of predictors_ to check for the best split. This reduces correlation between trees in a forest, improving prediction accuracy.
+
+We can grow a random forest in the same way, except now we use a smaller value for `mtry`. The default for regression trees is $p/3$ ($p$ is the number of predictors) and the default for classification trees is $\sqrt p$. Let's try `mtry = 6`.
+
+```{r}
+fit_rf <- randomForest(medv ~ ., data = train_set, mtry = 6)
+preds_rf = predict(fit_rf, newdata = test_set)
+mean((preds_rf - test)^2)
+sqrt(mean((preds_rf - test)^2))
+```
+
+Looks like the MSE for this random forest is worse (higher) with fewer predictors and the one using all of the predictors performs better
+
+## Tree-based methods summary
+
+Tree-based methods are very interpretable _prediction_ models for which some inferential tasks are possible (e.g., variable importance in random forests), but are much more limited than the linear models we saw previously. These methods are very commonly used across many application domains and Random Forests often perform at state-of-the-art for many tasks.
