@@ -257,7 +257,7 @@ For this we use the _bootstrap_. To create $T_j, \, j=1,\ldots,B$ from a trainin
 a) Create a bootstrap training set by sampling $N$ observations from training set **with replacement**
 b) Build a decision tree from the bootstrap training set
 
-Let's look at this using the Boston housing dataset. We fit a Random Forest by using the `randomForest()` function. Here, `mtry = 13` indicates all 13 predictors should be considered for each split of the tree - in other words, bagging should be done. 
+Let's look at this using the Boston housing dataset. We fit a Random Forest by using the `randomForest()` function. Here, `mtry = 13` indicates all 13 predictors should be considered for each split of the tree - in other words, **bagging** should be done. 
 
 ```{r, message=FALSE, warning=FALSE}
 library(randomForest)
@@ -280,9 +280,11 @@ Much, much better than the one decision tree we used above. With Random Forest w
 
 This is much lower than the $4,370 we got when using the one decision tree.
 
-The second Random Forest feature is to use a random selection of features to split when deciding partitions. Specifically, when building each tree $T_j$, at each recursive partition only consider a _randomly selected subset of predictors_ to check for the best split. This reduces correlation between trees in a forest, improving prediction accuracy.
+The second Random Forest feature is to use a random selection of features to split when deciding partitions. Specifically, when building each tree $T_j$, at each recursive partition only consider a _randomly selected subset of predictors_ to check for the best split. This **reduces correlation** between trees in a forest, improving prediction accuracy.
 
-We can grow a random forest in the same way, except now we use a smaller value for `mtry`. The default for regression trees is $p/3$ ($p$ is the number of predictors) and the default for classification trees is $\sqrt p$. Let's try `mtry = 6`.
+We can train a random forest as we did before, except now we use a smaller value for `mtry`. The default for regression trees is $p/3$ ($p$ is the number of predictors) and the default for classification trees is $\sqrt p$. The defaults come from the [original paper](https://www.stat.berkeley.edu/~breiman/randomforest2001.pdf) and a [follow-up paper](https://www.stat.berkeley.edu/~breiman/Using_random_forests_V3.1.pdf) that introduced the Random Forest model and have some mathematical reasons on why they are suggested.
+
+The $\sqrt 13$ is small - 3.6 - so let's try `mtry = 6` to see if we can get better performance.
 
 ```{r}
 fit_rf <- randomForest(medv ~ ., data = train_set, mtry = 6)
@@ -291,8 +293,230 @@ mean((preds_rf - test)^2)
 sqrt(mean((preds_rf - test)^2))
 ```
 
-Looks like the MSE for this random forest is worse (higher) with fewer predictors and the one using all of the predictors performs better
+Looks like the MSE for this random forest is worse (higher) with fewer predictors and the one using all of the predictors performs better.
+
+Rather than changing `mtry` a bunch of times and comparing the performance of each model, we can use cross-validation to help find the best performing value. The setup is similar to what we saw with logistic regression, Naive Bayes, and KNN. 
+
+```{r}
+# Define the tuning grid for mtry (numbers 2-13)
+tune_grid <- expand.grid(mtry = seq(2, 13))
+
+# Set up training control (e.g., repeated cross-validation)
+train_control <- trainControl(method = "cv", 
+                              number = 10)
+
+# Train the random forest model with tuning
+rf_tuned_model <- train(medv ~ ., 
+                        data = train_set, 
+                        method = "rf", 
+                        tuneGrid = tune_grid, 
+                        trControl = train_control)
+
+# View the results and optimal mtry
+print(rf_tuned_model)
+plot(rf_tuned_model)
+```
+
+Interestingly, the best value using the training data is `mtry = 6` as we just ran before trying to tune the `mtry` parameter. However, just because the best performing parameter value is chosen using cross-validation, does not mean it will necessarily lead to the best performance on the test set. 
+
+One final neat thing about Random Forests - variable importance. A disadvantage of random forests is that we lose interpretability. However, we can use the fact that a bootstrap sample was used to construct trees to measure **variable importance** from the random forest. The importance of a variable translates to how predictive that variable is.
+
+Here is a table of **variable importance** values for the random forest we just constructed with `mtry = 6`.
+
+```{r}
+library(knitr)
+variable_importance <- importance(fit_rf) 
+tmp <- tibble(feature = rownames(variable_importance),
+                  Gini = variable_importance[,1]) %>%
+                  arrange(desc(Gini))
+kable(tmp[1:10,])
+```
+
+
+And a barplot of the same data showing only the most predictive features:
+
+```{r}
+tmp %>% ggplot(aes(x = reorder(feature, Gini), y = Gini)) +
+        geom_bar(stat = 'identity', fill = "darkred") +
+        coord_flip() + 
+        xlab("Feature") +
+        ylab("Gini Index")
+```
+
+In this case, `lstat` (metric for low socio-economic status) and `rm` (average number of rooms) are the most predictive features. 
+
+
+## Classification Trees
+
+We previously used decision trees and Random Forests for regression because our outcome variable was continuous. We now turn to classification trees, which are appropriate when the outcome is categorical. Although we have used the melanoma dataset throughout earlier lectures, it does not work well with tree-based classification methods; the available predictors do not provide enough information to meaningfully split the data, resulting in trees that contain only a single split. To better illustrate how classification trees work, we will instead use the `PimaIndiansDiabetes2` dataset from the `mlbench` package (the same dataset you saw in homework 4).
+
+The [Pima Indians Diabetes dataset from the `mlbench` package](https://rdrr.io/cran/mlbench/man/PimaIndiansDiabetes.html) contains clinical and demographic information on adult female members (age 21 years and older) of the Pima Indian population in Arizona. The data were collected by the National Institute of Diabetes and Digestive and Kidney Diseases to study factors associated with diabetes prevalence. Each record represents one individual and includes the variables listed below. The primary outcome is usually diabetes status (yes or no), but in this assignment `glucose` will be the outcome since it is a continuous variable. Researchers frequently use this dataset to demonstrate statistical modeling, classification techniques, and approaches for handling missing data in clinical and epidemiologic studies. 
+
+Note that we are using `PimaIndiansDiabetes2` and not `PimaIndiansDiabetes`. The dataset `PimaIndiansDiabetes2` contains a corrected version of the original data set. While the UCI repository index claims that there are no missing values, closer inspection of the data shows several physical impossibilities, e.g., blood pressure or body mass index of 0. In `PimaIndiansDiabetes2`, all zero values of `glucose`, `pressure`, `triceps`, `insulin` and `mass` have been set to `NA`.
+
+* `pregnant`:	Number of times pregnant
+* `glucose`:	Plasma glucose concentration (glucose tolerance test)
+* `pressure`:	Diastolic blood pressure (mm Hg)
+* `triceps`:	Triceps skin fold thickness (mm)
+* `insulin`:	2-Hour serum insulin (mu U/ml)
+* `mass`:	Body mass index (BMI)
+* `pedigree`:	Diabetes pedigree function (a genetic risk score)
+* `age`:	Age (years)
+* `diabetes`:	Class variable (test for diabetes)
+
+```{r}
+library(mlbench)
+data("PimaIndiansDiabetes2")
+
+PimaIndiansDiabetes2 <- PimaIndiansDiabetes2
+
+head(PimaIndiansDiabetes2)
+colSums(is.na(PimaIndiansDiabetes2))
+```
+
+Let's split the data into training and test sets. We have class imbalance so we will use the `stratified` function. 
+
+```{r}
+library(splitstackshape)
+set.seed(1)
+
+x            <- stratified(PimaIndiansDiabetes2, "diabetes", 0.7, keep.rownames = TRUE)
+train_set    <- x %>% dplyr::select(-rn)
+train_index  <- as.numeric(x$rn)
+test_set     <- PimaIndiansDiabetes2[-train_index,]
+test_set_y   <- test_set$diabetes
+dim(train_set)
+dim(test_set)
+```
+
+Because the dataset includes genuine missing values, we must deal with them before fitting any machine learning models. Many models, including decision trees and random forests in caret, do not accept missing values directly and will fail unless the missing entries are imputed.
+
+Imputation replaces missing values with estimated values based on the observed data. Although imputation is necessary, it must be performed carefully to avoid data leakage. Data leakage occurs when information from the test set influences any part of the model-building (training) process. If the imputation model uses information from the test set—for example, if we compute medians or regression imputation using both training and test data—then the model indirectly "sees" the test set during training. This can lead to overly optimistic performance estimates that will not generalize to new, unseen data.
+
+To avoid leakage, we follow a strict rule: any data-dependent preprocessing step must be learned using only the training set. This includes imputation. We first fit an imputation model using only the predictors in the training data. Once this imputation model is created, we apply the same imputation model to both the training and the test set predictors. In this way, the test set is transformed using rules learned exclusively from the training data, which mirrors the real-world scenario in which a model encounters new data after it has already been trained. By separating the imputation model fitting from the application of that model, we ensure that the preprocessing pipeline is consistent between training and testing and that no information from the test set influences model development.
+
+Below is the implementation of this approach using the `preProcess` function from the `caret` package.
+
+```{r}
+# Separate predictors from outcome for imputation
+train_x <- train_set %>% dplyr::select(-diabetes)
+train_y <- train_set$diabetes
+
+test_x <- test_set %>% dplyr::select(-diabetes)
+test_y <- test_set$diabetes
+
+# Fit imputation model on training data predictors only
+imputation_model <- preProcess(train_x, method = "medianImpute")
+
+# Apply same imputation model on the training and test sets
+train_x_imp <- predict(imputation_model, train_x)
+test_x_imp  <- predict(imputation_model, test_x)
+
+# Re-combine with outcome
+pima_imputed_train <- train_x_imp %>%
+  mutate(diabetes = train_y)
+
+pima_imputed_test <- test_x_imp %>%
+  mutate(diabetes = test_y,
+         diabetes_num = as.factor(ifelse(diabetes == "neg", 0, 1)))
+```
+
+Once the data have been imputed and prepared, we can begin fitting predictive models. We first train a Random Forest classifier. The `caret` framework allows us to tune the value of `mtry`, the number of predictors considered at each split, through cross-validation. We specify a grid of candidate `mtry` values and let `caret` fit multiple models. The model that performs best, as measured by the area under the ROC curve, is selected as the final Random Forest model. This helps ensure that the model generalizes well beyond the training data.
+
+```{r}
+set.seed(1)
+tune_grid <- expand.grid(mtry = seq(2, 8))
+
+train_control <- trainControl(method = "cv", 
+                              number = 10,
+                              classProbs = TRUE,
+                              summaryFunction = twoClassSummary)
+
+rf_tuned_model <- train(diabetes ~ ., 
+                        data      = pima_imputed_train, 
+                        method    = "rf", 
+                        tuneGrid  = tune_grid, 
+                        trControl = train_control,
+                        metric    = "ROC")
+
+rf_tuned_model
+```
+
+After training, we use the fitted model to predict diabetes probabilities for the test set. These predicted probabilities reflect the model's belief about the likelihood of diabetes for each individual given their predictor values. Converting these probabilities into class predictions using a 0.5 threshold allows us to evaluate the model's classification accuracy. The confusion matrix summarizes the model's performance by providing true positives, false positives, true negatives, and false negatives. This framework allows us to assess how well the Random Forest distinguishes between individuals with and without diabetes.
+
+```{r}
+p_hat_rf = predict(rf_tuned_model, newdata = pima_imputed_test, type = "prob")[,2]
+y_hat_rf = factor(ifelse(p_hat_rf > 0.5, 1, 0))
+
+confusionMatrix(data = as.factor(y_hat_rf), 
+                reference = pima_imputed_test$diabetes_num, 
+                positive = "1")
+```
+
+For the purposes of model comparison, we next fit a decision tree model. Using `caret`, we tune the tree's complexity parameter, `cp`, which controls how much the model is allowed to grow. A very small `cp` allows the tree to grow deep and potentially overfit the training data, while a larger `cp` prunes the tree back to a simpler structure. By selecting the `cp` value that maximizes the cross-validated ROC, we identify a balance between model complexity and predictive performance.
+
+After training the model, we again evaluate its predictions on the test set. The resulting confusion matrix summarizes how well the tree performs compared to the Random Forest model. To better understand the fitted tree, we visualize it using `rpart.plot`. The plot displays the splitting variable and threshold at each node, as well as the predicted class and class probabilities at each terminal leaf. This visualization provides insight into which variables the model considers most important and how it separates individuals into predicted diabetes and non-diabetes categories. The table of decision rules further translates the tree structure into a readable set of "if–then" statements that highlight the decision-making logic of the tree.
+
+```{r}
+set.seed(1)
+
+# Fit a classification tree using all of the available predictors
+rpart_tuned_model <- train(diabetes ~ ., 
+                           data      = pima_imputed_train, 
+                           method    = "rpart", 
+                           trControl = train_control,
+                           tuneLength = 10, # caret will try different complexity parameters
+                           metric    = "ROC")
+
+rpart_tuned_model
+
+# Use tree for prediction
+p_hat_rpart= predict(rpart_tuned_model, newdata = pima_imputed_test, type = "prob")[,2]
+y_hat_rpart = factor(ifelse(p_hat_rpart > 0.5, 1, 0))
+
+# Output performance metrics
+confusionMatrix(data = as.factor(y_hat_rpart), 
+                reference = pima_imputed_test$diabetes_num, 
+                positive = "1")
+
+# Access the final tree
+final_tree <- rpart_tuned_model$finalModel
+
+# Plot the tree
+rpart.plot(final_tree, digits = 4)
+
+# Create a table of final decision rules for the tree
+kable(rpart.rules(final_tree))
+```
+
+Although accuracy and confusion matrices are useful, they can be misleading when class imbalance is present or when the cost of misclassification differs between classes. ROC curves provide a threshold-independent view of model performance by plotting sensitivity against 1-specificity across all possible probability cutoffs. A model with strong discriminatory ability will have a curve that bows toward the upper left corner, indicating high sensitivity and specificity across a wide range of thresholds.
+
+To compare the Random Forest and decision tree models, we compute ROC curves for each and visualize them on the same plot. This makes it easy to see which model achieves a higher area under the curve (AUC), which is a common measure of overall classification performance. In most cases, the Random Forest model performs better because its ensemble structure reduces variance and captures more complex patterns in the data. The decision tree may be easier to interpret, but it often sacrifices predictive accuracy for simplicity. The AUC values printed below the plot concretely quantify these differences.
+
+```{r, message=FALSE}
+library(pROC)
+
+roc_tree  <- roc(pima_imputed_test$diabetes_num, p_hat_rpart)
+roc_rf    <- roc(pima_imputed_test$diabetes_num, p_hat_rf)
+```
+
+```{r}
+ggroc(list("Decision Tree" = roc_tree, 
+           "Random Forest" = roc_rf)) +
+  theme(legend.title = element_blank()) +
+  geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1), 
+               color = "black", 
+               linetype = "dashed") +
+  ylab("Sensitivity") +
+  xlab("Specificity") 
+```
+
+```{r}
+auc(roc_tree)
+auc(roc_rf)
+```
+
 
 ## Tree-based methods summary
 
-Tree-based methods are very interpretable _prediction_ models for which some inferential tasks are possible (e.g., variable importance in random forests), but are much more limited than the linear models we saw previously. These methods are very commonly used across many application domains and Random Forests often perform at state-of-the-art for many tasks.
+Tree-based methods offer a flexible and intuitive approach to prediction problems. Decision trees provide a clear, interpretable model that can reveal important structure in the data, such as nonlinear relationships and high-order interactions between predictors. However, because a single tree is highly sensitive to small changes in the data, it often lacks predictive accuracy compared to more robust ensemble methods. Random Forests address this limitation by averaging over many trees built on bootstrap samples, which substantially reduces variance and improves predictive performance. Although Random Forests are less interpretable than decision trees, they typically achieve strong results across a wide range of real-world classification problems. Understanding the trade-off between interpretability and predictive power is an important part of choosing an appropriate model for a given application.
