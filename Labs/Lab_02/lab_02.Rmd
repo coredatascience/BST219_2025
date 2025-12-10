@@ -1,0 +1,144 @@
+---
+title: 'Lab 2: R Basics Continued'
+output: html_document
+---
+
+Today we'll use a collection of functions in the package called `tidyverse`. The `tidyverse` contains tons of extremely useful functions that make data cleaning and manipulation a breeze. 
+
+
+## The Tidyverse
+
+Let's use the `gapminder` dataset again. We can use the `filter()` function to select rows according to values of a column, and we can use `select()` to select only specific columns according to their name. If we want a specific set of rows, we can use `slice()`.
+
+```{r, warning = F, message = F}
+library(dplyr)
+library(dslabs)
+data(gapminder)
+df <- gapminder
+```
+
+First, let's use `filter()`. Notice that we don't need to use `df$` in front of the names, since we supply `df` as the first argument to the function.
+
+```{r}
+# Filter
+head(filter(df, country == 'United States'))
+head(df[df$country == 'United States',])
+
+# Notice that filter automatically throws out NA -- no need for which()!
+head(filter(df, infant_mortality < 10))
+head(df[df$infant_mortality < 10,])
+
+# Multiple combinations
+head(filter(df, infant_mortality < 10 | life_expectancy > 80))
+```
+
+1. How many rows have `infant_mortality > 20` and `life_expectancy > 70`?
+
+```{r}
+# Your code here
+```
+
+
+Next we can use `select()` to get column names. `select()` doesn't require that we use quotes around names.
+
+```{r}
+# Select 3 columns (quotes work fine but not required)
+head(select(df, country, year, infant_mortality))
+head(select(df, 'country', 'year', 'infant_mortality'))
+
+# Select everything except the region column
+head(select(df, -region))
+```
+
+```{r}
+### 1st row of df
+slice(df, 1)
+
+### rows 20-50 
+slice(df, 20:50)
+```
+
+
+We can also order a data frame using the `arrange()` function.
+
+```{r}
+# Default is increasing
+head(arrange(df, infant_mortality))
+head(df[order(df$infant_mortality),]) # this is a little ugly
+
+# Use desc() for decreasing
+head(arrange(df, desc(infant_mortality)))
+head(df[order(df$infant_mortality, decreasing = T),]) # even more ugly
+
+# Sort by continent, then region
+head(arrange(df, continent, region))
+head(df[order(df$continent, df$region),]) # even more ugly
+
+
+# First sort by continent [A-Z] then in descending order of infant mortality rate
+df4 <- arrange(df, continent, desc(infant_mortality)) # much prettier/simpler!
+```
+
+2. Create a dataset that includes country, year, gdp and population for countries in South-Eastern Asia between 1965 and 2010. Order the data frame by country, then year. Confirm that your code is doing what it's supposed to.
+
+```{r}
+# Your code here
+```
+
+
+### The pipe operator `%>%`
+
+To generate the result above, you may have needed multiple steps or lines of code. We can use the pipe operator `%>%` to avoid using some of the intermediate steps and to cut down on the amount of code we need to type. This makes for much more intuitive and fun data wrangling.
+
+For example, we can create the data frame mentioned above in an elegant, intuitive way:
+
+```{r}
+algeriagdp <- gapminder %>% 
+  filter(country == 'Algeria') %>% 
+  select(gdp, year)
+
+# One way
+x <- filter(gapminder, country == 'Algeria')
+head(select(x, gdp, year))
+
+# Another way (hard to read)
+head(select(filter(gapminder, country == 'Algeria'), gdp, year))
+
+```
+
+3. Now, using the pipe operator, create a dataset that includes `country`, `year`, `gdp` and `population` for countries in South-Eastern Asia between 1965 and 2010. Order the data frame by `country`, then `year`. Try to do it all in one command, starting from the `gapminder` dataset and using the pipe operator. Confirm that your code is doing what it's supposed to by printing out the result.
+
+```{r}
+# Your code here
+```
+
+### Creating variables
+
+We can create variables using the function `mutate()`.
+
+```{r}
+gapminder <- mutate(gapminder, 'gdp_per_capita' = gdp/population)
+
+# Same thing but using the pipe
+gapminder <- gapminder %>% 
+  mutate('gdp_per_capita' = gdp/population)
+```
+
+4. Create a variable with the approximate number of women in the population. Assume that 52% of the population are women.
+
+```{r}
+# Your code here
+```
+
+5. Calculate an approximation of the number of children born each year based on the `fertility` column, which displays the expected number of children per woman over their reproductive life. For this, assume an average reproductive life of 25 years.
+
+```{r}
+# Your code here
+```
+
+--- 
+
+You can find a list of our spells... ehhhm, functions [here](https://rstudio.github.io/cheatsheets/data-transformation.pdf).
+
+
+And a list of other useful spellbooks (cheat sheets) [here](https://posit.co/resources/cheatsheets/). 
