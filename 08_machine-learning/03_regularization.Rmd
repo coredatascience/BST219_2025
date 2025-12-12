@@ -115,7 +115,20 @@ load("meps.rData")
 meps %>% dplyr::select(Age, Diabetes.diagnosis, Perceived.health, Anyhosp2016, Anyhosp2017) %>% head
 ```
 
-The `glmnet` function from the `glmnet` package fits ridge and lasso for both regression and classification problems. However, the `glmnet` function expects you to pass in the predictors as a numeric model matrix: it can't handle categorical variables coded as factors. The `model.matrix` function creates the appropriate model matrix by converting factors into dummy variables as necessary. In the code below, `~ .-1` tells `model.matrix` to include all predictors except the intercept in the design matrix (by default, `glmnet` will include an intercept, so it's unneeded here). There are a total of 43 columns in the model matrix, compared to the 25 original predictors that include factor categorical variables. As usual, we split the data into 80% training and 20% test. 
+There is a category (level) defined to be part of the `Married` variable that does not show up in the dataset because none of the respondents chose the category ("Inapplicable"). This doesn't affect the model performance in any way, but it does change the code that calculates how many predictors were shrunk to 0 for each model. For ridge regression, none of the predictors are pushed exactly to 0, but if we do not remove the "Inapplicable" level from the dataset, the calculation will say that 2.27% of predictors are equal to 0, meaning 1 predictor, the indicator variable for the "Inapplicable" level. Below, to make sure the calculation is correct, we drop any levels that are defined for a predictor, but don't show up anywhere in the dataset. We do this using the `droplevels` function, and then check that it worked by printing the levels of the `Married` variable.
+
+```{r}
+levels(meps$Married)
+
+meps <- droplevels(meps)
+
+levels(meps$Married)
+```
+
+
+Now we are ready to train the models.
+
+The `glmnet` function from the `glmnet` package fits ridge and lasso for both regression and classification problems. However, the `glmnet` function expects you to pass in the predictors as a numeric model matrix: it can't handle categorical variables coded as factors. The `model.matrix` function creates the appropriate model matrix by converting factors into indicator variables (dummy variables) as necessary. In the code below, `~ .-1` tells `model.matrix` to include all predictors except the intercept in the design matrix (by default, `glmnet` will include an intercept, so it's not needed here). There are a total of 42 columns in the model matrix, compared to the 25 original predictors that include factor categorical variables. As usual, we split the data into 80% training and 20% test. 
 
 ```{r}
 # Predictor variables
@@ -170,10 +183,10 @@ Let's try this for ridge regression. Again, you must specify `alpha = 0` for the
 
 ```{r}
 cv_ridge = cv.glmnet(X_train, y_train, family = "binomial", alpha = 0)
-plot(cv_ridge)
+plot(cv_ridge, sign.lambda = 1)
 ```
 
-By default, the `coef` and `predict` functions for `cv.glmnet` use the model fit to `lambda.1se`, but you can tell them to use `lambda.min` by passing in `s = "lambda.min"`. We can see that only about two percent of the coefficients have been shrunk to exactly zero for both `lambda.min` and `lambda.1se`. 
+By default, the `coef` and `predict` functions for `cv.glmnet` use the model fit to `lambda.1se`, but you can tell them to use `lambda.min` by passing in `s = "lambda.min"`. We can see that only about two percent of the coefficients have been shrunk to exactly zero for both `lambda.min` and `lambda.1se`. This means only 1 predictor was shrunk to 0.
 
 ```{r}
 ridge_zero_coef = cbind(
@@ -184,11 +197,11 @@ rownames(ridge_zero_coef) = c("min", "1se")
 ridge_zero_coef
 ```
 
-For the lasso cross-validation, the `lambda.min` model shrinks 70% of the coefficients to zero and the `lambda.1se` model shrinks 86% of the coefficients to zero. This means that only 6 predictors remain in the latter case! 
+For the lasso cross-validation, the `lambda.min` model shrinks 72.1% of the coefficients to zero and the `lambda.1se` model shrinks 97.7% of the coefficients to zero. This means that only 11 predictors remain when `lambda.min` is used and only 1 predictor remains when `lambda.1se` is used! 
 
 ```{r}
 cv_lasso = cv.glmnet(X_train, y_train, family = "binomial", alpha = 1)
-plot(cv_lasso)
+plot(cv_lasso, sign.lambda = 1)
 
 lasso_zero_coef = cbind(
   lambda = c(cv_lasso$lambda.min, cv_lasso$lambda.1se), 
