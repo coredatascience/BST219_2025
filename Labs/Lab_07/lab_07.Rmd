@@ -1,0 +1,232 @@
+---
+title: 'Lab 7: Machine Learning III'
+output:
+  html_document
+---
+
+In this lab we will train and compare random forest, LASSO, and ridge regression models. The task will be multiclass classification, which means the outcome variable is categorical with more than 2 categories.
+
+## 1. Random Forests for Multi-Class Outcomes
+
+In the final section of this lab, we will use gene expression data to classify tissue samples. The data can be loaded from the `dslabs` package by calling `data(tissue_gene_expression)`. `tissuesGeneExpression` is a list with two elements: 
+
+- `x`: Numeric matrix with 189 rows and 500 columns. Each column contains gene expression measurements for a different gene. 
+- `y`: Factor vector of length 189 that records tissue type labels (cerebellum, colon, endometrium, hippocampus, kidney, liver, or placenta) . 
+
+The original data (accessible in the `tissuesGeneExpression` package) records gene expression for 22,215 genes. 
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(caret)
+library(GGally)
+library(tree)
+library(randomForest)
+library(dslabs)
+
+data(tissue_gene_expression)
+```
+
+We will only use a random sample of 100 genes to predict tissue type. 
+
+```{r}
+set.seed(25)
+tiss_ge <- 
+  data.frame(y = tissue_gene_expression$y, 
+             tissue_gene_expression$x[,sample(500, 100)])
+```
+
+As usual, we split the data into training and test sets, with 80% in the training set and 20% in the test set.
+
+```{r}
+set.seed(36)
+tiss_ge_index_train <- createDataPartition(y = tiss_ge$y, 
+                                           times = 1, p = 0.8, list = FALSE)
+
+tiss_ge_train_set <- tiss_ge[tiss_ge_index_train, ]
+tiss_ge_test_set  <- tiss_ge[-tiss_ge_index_train, ]
+
+nrow(tiss_ge_train_set)
+nrow(tiss_ge_test_set)
+```
+
+
+### Question 1.1
+
+Below, you will find some plots and tables of the training set designed to help you develop some intuition for the data. Describe what you see. 
+
+This is a frequency table for the tissue types in the training data. 
+
+```{r}
+table(tiss_ge_train_set$y)
+```
+
+It is difficult to make visualizations for all 100 genes in the dataset, so let's randomly sample six to focus on. 
+
+```{r}
+set.seed(49)
+genes6 <- sample(names(tiss_ge)[-1], 6)
+genes6
+```
+
+Here are histograms of the gene expression distributions of the six genes.  
+
+```{r}
+tiss_ge_train_set %>% 
+  pivot_longer(cols = genes6,
+               values_to = 'expression',
+               names_to = 'gene') %>% 
+  ggplot(aes(x = expression)) + 
+  geom_histogram(color = "black") + 
+  facet_wrap(~gene) + 
+  xlab(NULL) + ylab(NULL)
+```
+
+The boxplots below plot gene expression against tissue type for the six genes. Note that setting `scales = 'free_y'` allows the y-axis to vary from plot to plot, so they are not on the same scale. 
+
+```{r}
+tiss_ge_train_set %>% 
+  pivot_longer(cols = genes6,
+               values_to = 'expression',
+               names_to = 'gene') %>% 
+  ggplot(aes(x = y, y = expression)) + 
+  geom_boxplot() + 
+  facet_wrap(~ gene, scales = 'free_y') + 
+  xlab(NULL) + ylab(NULL) + 
+  scale_x_discrete(labels = str_to_title(unique(tiss_ge_train_set$y))) +
+  theme(axis.text.x = element_text(angle = 45, hjust=1))
+```
+
+The `ggcorr` function from the `GGally` package makes pretty correlation matrix plots. Each tiny square in this plot represents the correlation between a pair of genes (out of the entire set of 100 genes). Red indicates positive correlation (close to 1), blue indicates negative correlation (close to -1), and white indicates no correlation (close to 0). 
+
+```{r}
+ggcorr(tiss_ge_train_set[,-1], hjust = 1, size = 1.5, layout.exp = 10)
+```
+
+
+
+### Question 1.2
+
+Fit a bagging (bootstrap aggregation) model to the training data by running `randomForest` from the `randomForest` package with the `mtry` parameter set to the number of predictors (`mtry = 100`). Be sure to set a random seed so that your code is reproducible (the solutions use `set.seed(64)`). Get the predicted class labels for the test set data and report the test accuracy. 
+
+```{r}
+# Your code here
+```
+
+### Question 1.3
+
+Now, build a random forest model with the `mtry` parameter set to the square root of the number of predictors. Also, set `importance = TRUE` so that the importance of the predictors is assessed. You will need the variable importance information for Q1.4. Be sure to set a random seed so that your code is reproducible (the solutions use `set.seed(81)`). Get the predicted class labels for the test set data and report the test accuracy. 
+
+```{r}
+# Your code here
+```
+
+
+### Question 1.4
+
+Run the `importance` function on your random forest model from Q1.3 to extract variable importance measures for each of the tissue types. Find the five most important genes for classifying kidney tissues by ordering the Gini index measures. Make a bar plot of variable importance for all genes with Gini index >= 7.
+
+```{r}
+# Your code here
+```
+
+
+## 2. LASSO and ridge regression
+
+In this section, we will fit ridge and LASSO models using the same gene expression data. Unlike random forests, which are tree-based models, ridge and LASSO are penalized linear models.
+
+Because our outcome `y` is a multi-class factor (7 tissue types), we will use `glmnet` with `family = "multinomial"`, which fits a separate set of coefficients for each class.
+
+```{r, message=FALSE}
+# Load package needed to train LASSO and ridge regression models
+library(glmnet)
+```
+
+### Question 2.1 
+
+The `glmnet` function expects:
+
+* A numeric matrix of predictors `x`
+* A response `y`, which can be a factor for multinomial classification
+
+Create training and test matrices `x_train` and `x_test` from `tiss_ge_train_set` and `tiss_ge_test_set`, using all 100 genes as predictors (i.e., all columns except `y`). Then, create `y_train` and `y_test` from the tissue type column `y`. Finally, confirm the dimensions of the predictor matrices and the length of the outcome vectors.
+
+```{r}
+# Your code here
+```
+
+### Question 2.2
+
+Ridge regression shrinks coefficients toward zero but does not set them exactly to zero. It can help when predictors are correlated and when we want to stabilize estimates.
+
+Use `cv.glmnet` to fit a ridge multinomial model and report `lambda.min` and `lambda.1se`.
+
+* Use `x_train` and `y_train`
+* Set `family = "multinomial"` and `alpha = 0`
+* Let `cv.glmnet` choose `lambda.min` and `lambda.1se` using 10-fold cross-validation (default)
+
+Note: without the `warning=FALSE` option in this code chunk, you will get this warning: `Warning :one multinomial or binomial class has fewer than 8  observations; dangerous ground`. This is because there are only 5 training examples that are in the placenta category and multiclass classification can be less accurate for categories with small sample sizes. We can ignore this for this example, but you may want to use other ML methods in practice if you have a smaller sample size.
+
+```{r}
+# Your code here
+```
+
+
+### Question 2.3
+
+Plot the cross-validation curve.
+
+```{r}
+# Your code here
+```
+
+
+### Question 2.4
+
+Using `lambda.min`, obtain predicted class labels on the test set and compute the test accuracy. Compare the ridge test set accuracy to the random forest test set accuracy from Section 1.
+
+```{r}
+# Your code here
+```
+	
+### Question 2.5
+
+LASSO (with `alpha = 1`) can shrink some coefficients exactly to zero, performing variable selection. This can lead to simpler models that use only a subset of the genes.
+
+Fit a LASSO multinomial model using `cv.glmnet`. Use `x_train` and `y_train` and set `family = "multinomial"` and `alpha = 1`. Report `lambda.min` and `lambda.1se`.
+
+Note: without the `warning=FALSE` option in this code chunk, you will get this warning: `Warning :one multinomial or binomial class has fewer than 8  observations; dangerous ground`. This is because there are only 5 training examples that are in the placenta category and multiclass classification can be less accurate for categories with small sample sizes. We can ignore this for this example, but you may want to use other ML methods in practice if you have a smaller sample size.
+
+```{r}
+# Your code here
+```
+
+
+### Question 2.6
+
+Using `lambda.min`, compute predicted class labels on the test set and the test set accuracy.
+
+```{r}
+# Your code here
+```
+
+
+### Question 2.7
+
+Using `lambda.1se`, examine how many genes have non-zero coefficients for the kidney tissue class.
+
+```{r}
+# Your code here
+```
+
+
+### Question 2.8
+
+Compare the LASSO accuracy to ridge and random forest.
+
+* Summarize how the test accuracies of ridge, LASSO, and random forest compare on this dataset.
+* Explain, in words, the main trade-offs between these methods in this high-dimensional gene expression setting (many correlated predictors and multiple classes).
+* If you wanted a model that is both reasonably accurate and easier to interpret for biologists, which method would you lean toward and why?
+
+
+
+
