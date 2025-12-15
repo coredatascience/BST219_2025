@@ -312,3 +312,334 @@ auc(roc_ridge)
 ```
 
 
+## Dimension reduction
+
+The methods that we have discussed so far in this section have controlled variance in two different ways, either by using a subset of the original variables, or by shrinking their coefficients toward zero. These methods are defined using the original predictors, $X_1,X_2, . . . ,X_p$. We now explore
+an approach that transforms the predictors and then fits a model using the transformed variables. This technique is known as dimension reduction. There are several methods of dimension reduction, but we will focus on principal component analysis (PCA) here. 
+
+### Principal component analysis (PCA)
+
+Principal component analysis (PCA) is an alternative approach for controlling variance that does so by *dimension reduction*. Instead of shrinking coefficients toward zero like ridge and lasso regression, PCA transforms the predictor variables into a set of new predictors called *principal components*. Without going into too much mathematical detail, the first principal component is a linear combination of the original predictors that captures the most variation in the observations. The second principal component is a linear combination of the original predictors with the largest variance constructed such that it is uncorrelated with the first principal component. One can proceed like this until you have the same number of principal components as there are original predictors. The idea is that a small number of the principal components may explain most of the variability in the predictor variables.  
+
+You may have noticed that the process for PCA doesn't involve the response variable. One way to incorporate the benefits of PCA into a machine learning model is to use a subset of the principal components to predict the response instead of the original predictors. By reducing the dimensions of the feature space, we can mitigate overfitting, which may allow the new model to outperform the one trained using the entire set of original predictors. This approach tends to work well when when the first few principal components sufficiently capture most of the variation in the predictors as well as the relationship with the response. However, PCA does not perform feature selection, since each component is a linear combination of all of the original variables! Principal components are usually much more difficult to interpret than the original predictor values, so we also lose interpretablity with this method. 
+
+To run PCA on the training set, we can use the built-in `prcomp` function. It is typically best to standardize your predictors before running PCA (`center = TRUE` centers the means to `0`, while `scale = TRUE` re-scales the standard deviations to be `1`). If you don't standardize, then predictors with high variance will be disproportionately influential on the resulting principal components. The exception is if all of your variables were measured in the same units or on the same scale, in which case it may make sense not to standardize. 
+
+
+### Breast Cancer Coimbra dataset
+
+The Breast Cancer Coimbra dataset, which you can view on the UCI Machine Learning Repository [here](https://archive.ics.uci.edu/ml/datasets/Breast+Cancer+Coimbra), measures nine quantitative clinical features for 64 patients with breast cancer and 52 healthy controls. 
+
+Features:
+
+* `Age` (years)
+* `BMI` (kg/m2)
+* `Glucose` (mg/dL)
+* `Insulin` (µU/mL)
+* `HOMA` (Homeostasis model assessment for insulin resistance)
+* `Leptin` (ng/mL)
+* `Adiponectin` (µg/mL)
+* `Resistin` (ng/mL)
+* `MCP.1` (pg/dL)
+
+Outcome:
+
+* `Classification`: 1 = healthy control; 2 = cancer patient
+
+```{r}
+# Read in breast cancer data
+bc_dat = read.csv("breast_cancer.csv")
+
+head(bc_dat)
+```
+
+We will use `1` to indicate breast cancer patients and `0` to indicate controls. We randomly split half of the data into a training set and half into a test set. I chose a 50/50 split for training and testing since this dataset is quite small. 
+
+```{r}
+# Predictor variables
+predictors = setdiff(names(bc_dat), "Classification")
+
+# Recode Classification as a factor with 1 for cases and 0 for controls
+bc_dat$Classification = factor(ifelse(bc_dat$Classification == 2, 1, 0))
+
+# Split the data into a training set and a test set
+set.seed(219)
+train_idx = createDataPartition(bc_dat$Classification, 
+                                   times = 1, p = 0.5, list = FALSE)
+bc_train = bc_dat[train_idx, ]
+bc_test = bc_dat[-train_idx, ]
+```
+
+The `cor` and `corrplot`functions we saw in the linear regression module provide a nice visualization of the correlation between the nine predictor variables. Notice that many of the predictors are correlated, to varying degrees. 
+
+```{r, message=FALSE}
+library(corrplot)
+corr_matrix <- cor(bc_train[,predictors], 
+                   method = "spearman")
+corrplot(corr_matrix, 
+         method = "number", 
+         type = "upper", 
+         tl.col = "black", 
+         tl.srt = 45)
+```
+
+To run PCA on the training set, we can use the built-in `prcomp` function. It is typically best to standardize your predictors before running PCA (`center = TRUE` centers the means to `0`, while `scale = TRUE` re-scales the standard deviations to be `1`). If you don't standardize, then predictors with high variance will be disproportionately influential on the resulting principal components. The exception is if all of your variables were measured in the same units or on the same scale, in which case it may make sense not to standardize. 
+
+```{r}
+pca = prcomp(bc_train[,predictors], center = TRUE, scale = TRUE)
+```
+
+If we calculate the correlation matrix on the transformed data, we can see that are principal components are completely uncorrelated with each other! 
+
+```{r}
+corr_matrix <- cor(data.frame(pca$x))
+round(corr_matrix, digits = 2)
+corrplot(corr_matrix, method = "number", type = "upper", tl.col = "black", tl.srt = 45)
+```
+
+Below, we plot the percent of variability explained by each of the nine principal components. This plot is sometimes called a scree plot. You can see that about half of the variability in the predictors is captured by the first two PCs, and that almost 90% of the variability is captured by the first five PCs. 
+
+```{r}
+# % variance explained (eigenvalues / total)
+var_explained <- (pca$sdev^2) / sum(pca$sdev^2) * 100
+
+scree_df <- tibble(
+  PC = factor(paste0("PC", seq_along(var_explained)),
+              levels = paste0("PC", seq_along(var_explained))),
+  pct = var_explained
+)
+
+ggplot(scree_df, aes(x = PC, y = pct)) +
+  geom_col(fill = "darkred") +
+  labs(x = "Principal component", 
+       y = "% Variability explained") +
+  theme_minimal()
+```
+
+
+```{r}
+var_explained <- (pca$sdev^2) / sum(pca$sdev^2) * 100
+
+scree_df <- tibble(
+  PC_num = seq_along(var_explained),
+  PC = factor(paste0("PC", PC_num), levels = paste0("PC", PC_num)),
+  pct = var_explained,
+  cum_pct = cumsum(var_explained)
+)
+
+ggplot(scree_df, aes(x = PC)) +
+  geom_col(aes(y = pct), fill = "darkred") +
+  geom_line(aes(y = cum_pct, group = 1)) +
+  geom_point(aes(y = cum_pct)) +
+  labs(x = "Principal component",
+       y = "% Variability explained",
+       title = "Scree plot with cumulative variance") +
+  theme_minimal()
+```
+
+
+## Principal component regression (PCR)
+
+Principal Component Regression (PCR) uses the PCs from PCA as new predictors in a regression model, addressing multicollinearity by creating a stable, smaller set of predictors, essentially combining PCA for feature extraction with standard regression for prediction. PCA is unsupervised (no dependent variable), focusing on data structure; PCR is supervised, using PCs to predict an outcome. PCR reduces model complexity and standard errors by adding slight bias, making it better for collinear data than standard multiple regression.  
+
+Let's fit a logistic regression model to predict breast cancer status based on all nine original predictor values.
+
+```{r}
+fit_original = glm(Classification ~ ., 
+                   data = bc_train, 
+                   family = "binomial")
+
+fit_original_preds = predict(fit_original, 
+                             newdata = bc_test, 
+                             type = "response")
+```
+
+Now, let's fit a logistic regression model that uses just the first principal component to predict breast cancer status. 
+
+```{r}
+# Add training set outcome to PCs
+bc_train_pca = data.frame(pca$x, Classification = bc_train$Classification)
+
+# Train PC1 model
+fit_PCA1 = glm(Classification ~ PC1, 
+               data = bc_train_pca, 
+               family = "binomial")
+```
+
+Getting new predictions can be a little tricky, since the test set needs to be transformed into the same space as the PCA you ran on the training set. The `predict` function for `prcomp` does the hard work for us: you simply need to pass in the object that you got from running `prcomp` on the training set, and the test set predictors. Then, you can proceed as usual with the transformed test set.
+
+```{r}
+# Transform the test set using the PCA from the training set
+pca_pred = predict(pca, newdata = bc_test)
+
+# Add test set outcome to transformed predictors 
+bc_test_pca = data.frame(pca_pred, 
+                         Classification = bc_test$Classification)
+```
+
+```{r}
+fit_PCA1_preds = predict(fit_PCA1, 
+                         newdata = bc_test_pca, 
+                         type = "response")
+```
+
+Now, let's fit a logistic regression model that uses the first 5 principal components to predict breast cancer status. 
+
+```{r}
+# Train PC1-PC5 model
+fit_PCA5 = glm(Classification ~ PC1 + PC2 + PC3 + PC4 + PC5, 
+               data = bc_train_pca, 
+               family = "binomial")
+
+fit_PCA5_preds = predict(fit_PCA5, 
+                         newdata = bc_test_pca, 
+                         type = "response")
+```
+
+In practice, you typically want to choose the number of principal components to include in your model based on a cross-validation exercise. You can also choose the number of principal components to keep based on the amount of variance that you would like to capture in the predictors (e.g., 80% or 90%) or by making a scree plot and visually assessing where the big drop-off ("elbow") in variance explained occurs. The varability explained in the scree plot we created seems to start to plateau after the fifth PC, which is why we chose the first 5 PCs to include in the last model. 
+
+Below is a function that takes in the true labels of the outcome, the predicted probabilities from a model, a classification threshold (set to 0.5 as the default), and an indicator of the "positive" group (set to "1" by default), and returns the confusion matrix, roc object needed to create an ROC curve, the AUC value, and the threshold used to turn predicted probabilities into 0s and 1s. A function like this is not always needed, but I wanted you to see how to create one when you are fitting multiple ML models the same way. It can ultimately reduce the amount of code you have to write. 
+
+```{r}
+# Function: evaluate a binary classification model
+# Assumes outcome is a factor with levels c("0","1") (controls, cases).
+# positive = "1" (cancer patient)
+eval_binary <- function(truth, prob, threshold = 0.5, positive = "1") {
+  truth <- factor(truth, levels = c("0", "1"))
+  
+  pred_class <- factor(ifelse(prob >= threshold, positive, "0"),
+                       levels = c("0", "1"))
+  
+  # Confusion matrix + many useful metrics
+  cm <- confusionMatrix(
+    data = pred_class,
+    reference = truth,
+    positive = positive
+  )
+  
+  # ROC / AUC
+  roc_obj <- roc(response = truth, 
+                 predictor = prob,
+                 levels = c("0", positive), direction = "<")
+  auc_val <- as.numeric(auc(roc_obj))
+  
+  # Return list of outputs
+  list(
+    cm = cm,
+    roc = roc_obj,
+    auc = auc_val,
+    threshold = threshold
+  )
+}
+```
+
+This function extracts specific values from the confusion matrix. This function also isn't necessarily needed, but I use it to make a table of performance metrics for each model (to ease comparison) later on. 
+
+```{r}
+# Extract performance metrics from confusionMatrix
+cm_metrics <- function(cm_obj, auc_val, model_name) {
+  data.frame(
+    model = model_name,
+    accuracy = unname(cm_obj$overall["Accuracy"]),
+    sensitivity = unname(cm_obj$byClass["Sensitivity"]),
+    specificity = unname(cm_obj$byClass["Specificity"]),
+    balanced_accuracy = unname(cm_obj$byClass["Balanced Accuracy"]),
+    auc = auc_val
+  )
+}
+```
+
+We'll first look at the results for the model using all of the original predictors. 
+
+```{r}
+# Probabilities already computed:
+# fit_original_preds <- predict(fit_original, newdata = bc_test, type = "response")
+
+res_original <- eval_binary(truth = bc_test$Classification,
+                            prob  = fit_original_preds,
+                            threshold = 0.5)
+
+# Confusion matrix
+res_original$cm
+
+# AUC
+res_original$auc
+```
+
+Now the results for the model only using PC1.
+
+```{r}
+# fit_PCA1_preds already computed on bc_test_pca
+res_pca1 <- eval_binary(truth = bc_test_pca$Classification,
+                        prob  = fit_PCA1_preds,
+                        threshold = 0.5)
+
+res_pca1$cm
+res_pca1$auc
+```
+
+And finally, the model using PC1 - PC5.
+
+```{r}
+# fit_PCA5_preds already computed on bc_test_pca
+res_pca5 <- eval_binary(truth = bc_test_pca$Classification,
+                        prob  = fit_PCA5_preds,
+                        threshold = 0.5)
+
+res_pca5$cm
+res_pca5$auc
+```
+
+The code below plots the ROC curves on the same plot for easier comparison.
+
+```{r}
+roc_df <- bind_rows(
+  data.frame(
+    fpr = 1 - res_original$roc$specificities,
+    tpr = res_original$roc$sensitivities,
+    model = paste0("Original (AUC=", round(res_original$auc, 3), ")")
+  ),
+  data.frame(
+    fpr = 1 - res_pca1$roc$specificities,
+    tpr = res_pca1$roc$sensitivities,
+    model = paste0("PCA1 (AUC=", round(res_pca1$auc, 3), ")")
+  ),
+  data.frame(
+    fpr = 1 - res_pca5$roc$specificities,
+    tpr = res_pca5$roc$sensitivities,
+    model = paste0("PCA1–5 (AUC=", round(res_pca5$auc, 3), ")")
+  )
+)
+
+ggplot(roc_df, aes(x = fpr, y = tpr, color = model)) +
+  geom_line(linewidth = 1) +
+  geom_abline(linetype = "dashed") +
+  coord_equal() +
+  labs(
+    title = "ROC curves",
+    x = "1 - Specificity",
+    y = "Sensitivity",
+    color = "Model"
+  ) +
+  theme_minimal()
+```
+
+
+Finally, here is the table of values to help compare the models. In this particular case, I personally would stick with the model that uses all of the original predictors since it retains interpretability. 
+
+```{r, message=FALSE}
+library(kableExtra)
+perf_tbl <- bind_rows(
+  cm_metrics(res_original$cm, res_original$auc, "Original"),
+  cm_metrics(res_pca1$cm,     res_pca1$auc,     "PCA1"),
+  cm_metrics(res_pca5$cm,     res_pca5$auc,     "PCA1–5")
+) %>%
+  mutate(across(where(is.numeric), ~ round(.x, 3)))
+
+kable(perf_tbl)
+```
+
+
+
+
+
