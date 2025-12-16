@@ -1,0 +1,387 @@
+---
+title: "K-means Clustering"
+output: 
+  html_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+## Introduction: Unsupervised Learning in Public Health and Medicine
+
+In earlier parts of the course, we focused on **supervised learning** methods, such as linear regression and logistic regression. In supervised learning:
+
+- We have an outcome (or **response**) variable, often called $y$.
+- We have predictor variables (features), often called $x_1, x_2, \dots, x_p$.
+- The goal is to learn a relationship between $x$ and $y$, and to make predictions of $y$ for new observations.
+
+In contrast, **unsupervised learning** does **not** use an outcome variable. Instead:
+
+- We only observe $x_1, x_2, \dots, x_p$ (features).
+- There is **no outcome** to predict.
+- The goal is to discover **structure** or **patterns** in the data.
+
+Common unsupervised learning tasks include:
+
+- **Clustering**: grouping similar observations together.
+- **Dimension reduction**: summarizing high-dimensional features with fewer variables (e.g., PCA).
+
+In this lecture, we will focus on one of the most widely used clustering methods: **k-means clustering**.
+
+## K-means Clustering: Intuition
+
+K-means clustering is a method to partition data into $k$ groups (clusters) based on similarity.
+
+High-level idea:
+
+- We choose a number of clusters $k$.
+- Each observation belongs to the cluster with the **closest center** (centroid).
+- The algorithm tries to find cluster centers that minimize the **within-cluster variation** (how spread out or dissimilar points are within each cluster).
+
+Conceptually:
+
+1. **Initialize**: Start with $k$ initial cluster centers.
+2. **Assign step**: Assign each observation to its nearest center.
+3. **Update step**: Recompute each center as the mean of all observations assigned to that cluster.
+4. Repeat steps 2–3 until the cluster assignments no longer change (or change very little).
+
+Important points:
+
+- K-means uses **distance** (usually Euclidean distance), so variables should be on similar scales.
+- We must **choose $k$**; there is no "automatic" best choice.
+- The algorithm can converge to **local optima** (rather than global optima, which is what we are aiming for), so we often run it multiple times with different starting points (controlled via `nstart`).
+
+## Example Dataset: Pima Indians Diabetes
+
+For our example, we will use the `PimaIndiansDiabetes2` dataset from the `mlbench` package. This dataset includes clinical and demographic measures for women of Pima Indian heritage, 21 years and older, with a binary indicator of whether they have diabetes.
+
+We will:
+
+- Use several **numeric clinical variables** for clustering.
+- **Ignore the diabetes status** when fitting the clustering model (to make this an unsupervised model).
+- Later, compare clusters to diabetes status to see whether the clusters align with disease risk. Note that this is not what you would normally do since you want the model to define it's own clusters, but this is more for intuition and educational purposes. 
+
+```{r, message=FALSE}
+library(tidyverse)
+library(mlbench)
+
+data("PimaIndiansDiabetes2")
+
+# Take a quick look at the data
+head(PimaIndiansDiabetes2)
+```
+
+Key variables (simplified):
+
+- `glucose`: plasma glucose concentration (mg/dL)
+- `pressure`: diastolic blood pressure (mmHg)
+- `triceps`: triceps skinfold thickness (mm)
+- `insulin`: 2-hour serum insulin (mu U/ml)
+- `mass`: body mass index (BMI)
+- `age`: age (years)
+- `diabetes`: factor indicating diabetes status ("pos" vs "neg")
+
+For clustering, we will focus on a subset of numeric features that are clinically meaningful and reasonably complete (we will use rows with complete cases).
+
+### Data Preparation for K-means
+
+K-means requires **numeric** input variables and is sensitive to **missing values** and **different scales**.
+
+Steps:
+
+1. Select numeric columns we want to include.
+2. Remove observations with missing values in those columns.
+3. Standardize (scale) the variables so that they have mean 0 and standard deviation 1.
+
+```{r}
+# Select numeric variables for clustering (keep diabetes for later comparison)
+pima_num <- PimaIndiansDiabetes2 %>%
+  select(glucose, pressure, triceps, insulin, mass, age, diabetes)
+
+# Remove rows with missing values in these variables
+pima_complete <- pima_num %>%
+  drop_na()
+
+# Check how many observations remain
+nrow(pima_num)
+nrow(pima_complete)
+```
+
+We now create a **scaled** version of the numeric variables (excluding the diabetes outcome). Scaling ensures that variables with large units (e.g., glucose) do not dominate variables with smaller units (e.g., age).
+
+```{r}
+# Data frame of numeric features (without the outcome)
+pima_features <- pima_complete %>%
+  select(glucose, pressure, triceps, insulin, mass, age)
+
+# Scale the variables: each column to have mean 0, sd 1
+pima_scaled <- scale(pima_features)
+
+# Inspect summary of scaled variables
+summary(pima_scaled)
+```
+
+At this point, `pima_scaled` is a numeric data frame with standardized features, ready for k-means clustering.
+
+### Choosing the Number of Clusters (k)
+
+K-means requires us to specify the number of clusters $k$ in advance. There is no single "correct" way to choose $k$, but common approaches include:
+
+- **Subject-matter knowledge**: How many meaningful subgroups do we expect clinically?
+- **Elbow method**: Plot the total within-cluster sum of squares (variability) versus $k$, and look for an "elbow."
+- **Silhouette scores** and other criteria (more advanced).
+
+Here we implement the **elbow method**, trying $k = 1, 2, \dots, 8$ and computing the total within-cluster sum of squares.
+
+```{r}
+set.seed(219)  # for reproducibility
+
+# Use the sapply function to apply this function to k = 1-8
+wss <- sapply(1:8, function(k) {
+  kmeans(pima_scaled, centers = k, nstart = 25)$tot.withinss
+})
+
+elbow_df <- data.frame(
+  k = 1:8,
+  wss = wss
+)
+
+elbow_df
+```
+
+```{r}
+elbow_df %>%
+  ggplot(aes(x = k, y = wss)) +
+  geom_line() +
+  geom_point() +
+  scale_x_continuous(breaks = 1:8) +
+  labs(title = "Elbow Plot for K-means Clustering",
+       x = "Number of clusters (k)",
+       y = "Total within-cluster sum of squares") +
+  theme_minimal()
+```
+
+Interpretation:
+
+- As $k$ increases, the within-cluster variation (WSS) always decreases.
+- We look for a point where the decrease slows down – the "elbow."
+- Suppose we see a bend around $k = 2$ or $k = 3$. We will fit both and compare.
+
+### Fitting K-means with k = 2
+
+We now fit k-means clustering with **k = 2** clusters using the `kmeans` function. Remember: we are not using the `diabetes` outcome in the model; we are clustering based on the clinical measurements.
+
+```{r}
+set.seed(219)
+
+k2 <- kmeans(pima_scaled, centers = 2, nstart = 25)
+
+# Print summary of the k-means result
+k2
+```
+
+Key elements in the output:
+
+- `cluster`: cluster assignments for each observation.
+- `centers`: the cluster centers (means of each variable within clusters, on the *scaled* scale).
+- `tot.withinss` and `betweenss`: measures of within- and between-cluster variation.
+
+We can attach the cluster labels back to the complete dataset and examine basic summaries.
+
+```{r}
+pima_k2 <- pima_complete %>%
+  mutate(cluster = factor(k2$cluster))
+
+# How many observations per cluster?
+pima_k2 %>%
+  count(cluster)
+```
+
+### Interpreting clusters with summaries on the original scale
+
+Cluster centers from `kmeans()` are on the *scaled* scale. A more interpretable summary is to compute the mean of each original variable within each cluster.
+
+```{r}
+cluster_means_k2 <- pima_k2 %>%
+  group_by(cluster) %>%
+  summarize(
+    glucose = mean(glucose, na.rm = TRUE),
+    pressure = mean(pressure, na.rm = TRUE),
+    triceps = mean(triceps, na.rm = TRUE),
+    insulin = mean(insulin, na.rm = TRUE),
+    mass = mean(mass, na.rm = TRUE),
+    age = mean(age, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+cluster_means_k2
+```
+
+Questions to think about:
+
+- Which cluster looks "higher risk" based on glucose and BMI?
+- Are there meaningful differences in age?
+- Do the clusters suggest distinct clinical profiles?
+
+### Visualizing clusters with principal components (PCA)
+
+Because we have multiple numeric variables, we cannot visualize clusters directly in the original feature space.
+
+A common strategy is to:
+
+1. Perform **principal component analysis (PCA)** on the scaled features.
+2. Plot the first two principal components and color points by cluster.
+
+This is not part of k-means itself, but it provides a helpful visualization.
+
+```{r}
+# Don't need to scale here since the data is already scaled
+pca <- prcomp(pima_scaled, center = FALSE, scale. = FALSE)
+
+pca_df_k2 <- data.frame(
+  PC1 = pca$x[, 1],
+  PC2 = pca$x[, 2],
+  cluster = pima_k2$cluster,
+  diabetes = pima_k2$diabetes
+)
+
+ggplot(pca_df_k2, aes(x = PC1, y = PC2, color = cluster)) +
+  geom_point(alpha = 0.7) +
+  labs(title = "K-means Clusters (k = 2) Visualized with PCA",
+       color = "Cluster") +
+  theme_minimal()
+```
+
+Interpretation notes:
+
+- Points that are closer together are more similar in terms of the selected clinical variables.
+- If clusters overlap heavily in this plot, the separation may not be very strong.
+
+### Relating clusters to diabetes status (post-hoc check)
+
+Although k-means clustering is unsupervised, we can compare clusters to the **diabetes outcome** as a *post-hoc* analysis.
+
+This does **not** mean k-means is "predicting diabetes," but it can tell us whether the clusters correspond to different diabetes prevalence.
+
+```{r}
+cluster_diabetes_tab_k2 <- pima_k2 %>%
+  count(cluster, diabetes) %>%
+  group_by(cluster) %>%
+  mutate(prop = n / sum(n))
+
+cluster_diabetes_tab_k2
+```
+
+```{r}
+cluster_diabetes_tab_k2 %>%
+  ggplot(aes(x = cluster, y = prop, fill = diabetes)) +
+  geom_col(position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Diabetes Prevalence Within Each Cluster (k = 2)",
+       x = "Cluster",
+       y = "Proportion",
+       fill = "Diabetes status") +
+  theme_minimal()
+```
+
+
+## Trying k = 3 Clusters
+
+We now repeat the process with **k = 3** clusters to see whether it yields more interpretable or clinically meaningful groups.
+
+```{r}
+set.seed(219)
+
+k3 <- kmeans(pima_scaled, centers = 3, nstart = 25)
+
+pima_k3 <- pima_complete %>%
+  mutate(cluster = factor(k3$cluster))
+
+# Cluster sizes
+pima_k3 %>%
+  count(cluster)
+```
+
+```{r}
+cluster_means_k3 <- pima_k3 %>%
+  group_by(cluster) %>%
+  summarize(
+    glucose = mean(glucose, na.rm = TRUE),
+    pressure = mean(pressure, na.rm = TRUE),
+    triceps = mean(triceps, na.rm = TRUE),
+    insulin = mean(insulin, na.rm = TRUE),
+    mass = mean(mass, na.rm = TRUE),
+    age = mean(age, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+cluster_means_k3
+```
+
+### PCA visualization (k = 3)
+
+```{r}
+pca_df_k3 <- data.frame(
+  PC1 = pca$x[, 1],
+  PC2 = pca$x[, 2],
+  cluster = pima_k3$cluster,
+  diabetes = pima_k3$diabetes
+)
+
+ggplot(pca_df_k3, aes(x = PC1, y = PC2, color = cluster)) +
+  geom_point(alpha = 0.7) +
+  labs(title = "K-means Clusters (k = 3) Visualized with PCA",
+       color = "Cluster") +
+  theme_minimal()
+```
+
+### Post-hoc diabetes prevalence (k = 3)
+
+```{r}
+cluster_diabetes_tab_k3 <- pima_k3 %>%
+  count(cluster, diabetes) %>%
+  group_by(cluster) %>%
+  mutate(prop = n / sum(n))
+
+cluster_diabetes_tab_k3
+```
+
+```{r}
+cluster_diabetes_tab_k3 %>%
+  ggplot(aes(x = cluster, y = prop, fill = diabetes)) +
+  geom_col(position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Diabetes Prevalence Within Each Cluster (k = 3)",
+       x = "Cluster",
+       y = "Proportion",
+       fill = "Diabetes status") +
+  theme_minimal()
+```
+
+## Strengths and Limitations of K-means
+
+**Strengths**
+
+- Simple and fast to run.
+- Works well for moderately sized numeric datasets.
+- Produces clusters that are often easy to summarize (means by cluster).
+
+**Limitations**
+
+- You must pre-specify \\(k\\).
+- Sensitive to scaling and outliers.
+- Assumes clusters are roughly “spherical” in Euclidean space and similarly sized.
+- Can converge to different solutions depending on starting values (mitigated by `nstart`).
+
+## Summary
+
+Key takeaways:
+
+- **Unsupervised learning** methods like k-means clustering do not use an outcome variable; they aim to discover patterns directly from predictors.
+- K-means partitions observations into \\(k\\) groups by minimizing within-cluster variation.
+- Proper **preprocessing** (handling missing data and scaling variables) is crucial for meaningful clusters.
+- The choice of **k** is an important modeling decision; simple tools such as the **elbow method** can guide this choice.
+- In a public health or clinical setting, clusters can sometimes correspond to **risk profiles** or **subgroups** with different disease prevalence or health outcomes.
+- Clusters should be interpreted carefully and (ideally) validated using domain knowledge and external evidence.
